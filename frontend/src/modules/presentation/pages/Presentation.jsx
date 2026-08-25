@@ -42,6 +42,7 @@ import {
 } from "../../../firebase/firebase";
 
 
+
 // ======================================================
 // PRESENTATION PAGE
 // ======================================================
@@ -98,9 +99,7 @@ export default function Presentation() {
 
 
   useEffect(() => {
-
     loadWorkspacePresentation();
-
   }, []);
 
 
@@ -117,9 +116,7 @@ export default function Presentation() {
 
 
       if (!user) {
-
         return;
-
       }
 
 
@@ -166,6 +163,7 @@ export default function Presentation() {
   }
 
 
+
   // ====================================================
   // GENERATE PRESENTATION
   // ====================================================
@@ -204,7 +202,21 @@ export default function Presentation() {
           customPrompt:
             data.customPrompt,
 
+          // ==================================================
+          // PRESENTATION CONTENT MODE
+          //
+          // Comes directly from PresentationForm:
+          //
+          // "concise"
+          // or
+          // "detailed"
+          // ==================================================
+
+          presentationMode:
+            data.presentationMode,
+
         });
+
 
 
       const generatedTitle =
@@ -290,6 +302,7 @@ export default function Presentation() {
   }
 
 
+
   // ====================================================
   // EXPORT PRESENTATION
   // ====================================================
@@ -309,6 +322,7 @@ export default function Presentation() {
     try {
 
       setExporting(true);
+
       setError("");
 
 
@@ -324,35 +338,26 @@ export default function Presentation() {
 
 
         themeName:
-
           DEFAULT_PRESENTATION_THEME,
 
       });
 
     }
 
-
     catch (error) {
 
       console.error(
-
         "Presentation export failed:",
-
         error
-
       );
 
 
       setError(
-
         error?.message ||
-
         "Unable to export presentation."
-
       );
 
     }
-
 
     finally {
 
@@ -361,6 +366,7 @@ export default function Presentation() {
     }
 
   }
+
 
 
   // ====================================================
@@ -379,6 +385,7 @@ export default function Presentation() {
         text-white
       "
     >
+
 
       {/* ===============================================
           PAGE AMBIENT GLOW
@@ -421,6 +428,7 @@ export default function Presentation() {
         "
       >
 
+
         {/* =============================================
             PAGE HEADER
         ============================================== */}
@@ -433,6 +441,7 @@ export default function Presentation() {
             gap-4
           "
         >
+
 
           <div
             className="
@@ -454,6 +463,7 @@ export default function Presentation() {
               shadow-[0_0_28px_rgba(139,92,246,0.14)]
             "
           >
+
 
             <div
               className="
@@ -477,10 +487,13 @@ export default function Presentation() {
               "
             />
 
+
           </div>
 
 
+
           <div>
+
 
             <div
               className="
@@ -536,9 +549,12 @@ export default function Presentation() {
               Create AI-designed presentations with Nyxora AI
             </p>
 
+
           </div>
 
+
         </div>
+
 
 
         {/* =============================================
@@ -566,11 +582,13 @@ export default function Presentation() {
               size={18}
             />
 
+
             {error}
 
           </div>
 
         )}
+
 
 
         {/* =============================================
@@ -585,6 +603,7 @@ export default function Presentation() {
             lg:grid-cols-2
           "
         >
+
 
           {/* ===========================================
               LEFT SIDE
@@ -608,6 +627,7 @@ export default function Presentation() {
           </div>
 
 
+
           {/* ===========================================
               RIGHT SIDE
           ============================================ */}
@@ -617,6 +637,7 @@ export default function Presentation() {
               min-w-0
             "
           >
+
 
             {title && (
 
@@ -635,6 +656,7 @@ export default function Presentation() {
                   shadow-[0_10px_35px_rgba(0,0,0,0.18)]
                 "
               >
+
 
                 {/* TOP ACCENT */}
 
@@ -697,6 +719,7 @@ export default function Presentation() {
                     p-4
                   "
                 >
+
 
                   {/* TITLE */}
 
@@ -768,9 +791,12 @@ export default function Presentation() {
                         {title}
                       </p>
 
+
                     </div>
 
+
                   </div>
+
 
 
                   {/* ===================================
@@ -821,6 +847,7 @@ export default function Presentation() {
                       disabled:hover:translate-y-0
                     "
                   >
+
 
                     {/* SHINE */}
 
@@ -876,13 +903,17 @@ export default function Presentation() {
                         : "Export PPTX"}
                     </span>
 
+
                   </button>
 
+
                 </div>
+
 
               </div>
 
             )}
+
 
 
             {/* =========================================
@@ -905,11 +936,15 @@ export default function Presentation() {
 
             </div>
 
+
           </div>
+
 
         </div>
 
+
       </div>
+
 
     </div>
 

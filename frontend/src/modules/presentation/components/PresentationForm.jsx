@@ -73,6 +73,12 @@ export default function PresentationForm({
   ] = useState("");
 
 
+  const [
+    presentationMode,
+    setPresentationMode,
+  ] = useState("concise");
+
+
   // ====================================================
   // GENERATE
   // ====================================================
@@ -93,6 +99,8 @@ export default function PresentationForm({
       slideCount,
 
       customPrompt,
+
+      presentationMode,
 
     });
 
@@ -539,6 +547,165 @@ export default function PresentationForm({
               </p>
 
             </div>
+
+          </div>
+
+
+          {/* ===========================================
+              PRESENTATION MODE
+          ============================================ */}
+
+          <div
+            className="
+              relative
+              z-10
+              mb-4
+            "
+          >
+
+            <div
+              className="
+                mb-2
+                flex
+                items-center
+                justify-between
+                gap-3
+              "
+            >
+
+              <span
+                className="
+                  text-xs
+                  font-semibold
+                  uppercase
+                  tracking-[0.14em]
+                  text-slate-400
+                "
+              >
+                Presentation Mode
+              </span>
+
+
+              <span
+                className="
+                  text-[11px]
+                  text-slate-600
+                "
+              >
+                Choose content depth
+              </span>
+
+            </div>
+
+
+            <div
+              className="
+                grid
+                grid-cols-2
+                gap-2
+                rounded-xl
+                border
+                border-violet-400/15
+                bg-[#080D19]/70
+                p-1
+              "
+            >
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPresentationMode(
+                    "concise"
+                  )
+                }
+className={`
+  flex-1
+  rounded-lg
+  border
+  px-4
+  py-2.5
+  text-sm
+  font-medium
+  transition-all
+  duration-200
+
+  ${
+    presentationMode === "concise"
+      ? `
+        border-violet-400/30
+        bg-[#171329]
+        text-white
+        shadow-[0_0_18px_rgba(139,92,246,0.12)]
+      `
+      : `
+        border-transparent
+        bg-transparent
+        text-slate-500
+        hover:bg-white/[0.03]
+        hover:text-slate-300
+      `
+  }
+`}
+              >
+                Concise
+              </button>
+
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPresentationMode(
+                    "detailed"
+                  )
+                }
+className={`
+  flex-1
+  rounded-lg
+  border
+  px-4
+  py-2.5
+  text-sm
+  font-medium
+  transition-all
+  duration-200
+
+  ${
+    presentationMode === "detailed"
+      ? `
+        border-violet-400/30
+        bg-[#171329]
+        text-white
+        shadow-[0_0_18px_rgba(139,92,246,0.12)]
+      `
+      : `
+        border-transparent
+        bg-transparent
+        text-slate-500
+        hover:bg-white/[0.03]
+        hover:text-slate-300
+      `
+  }
+`}
+              >
+                Detailed
+              </button>
+
+            </div>
+
+
+            <p
+              className="
+                mt-2
+                text-[11px]
+                leading-5
+                text-slate-600
+              "
+            >
+              {presentationMode === "detailed"
+                ? "Detailed: deeper explanations, examples, steps and applications."
+                : "Concise: short, clean and presentation-friendly content."
+              }
+            </p>
 
           </div>
 

@@ -3058,6 +3058,16 @@ function addSmallInsightCard(
 // ✓ Existing colors/theme preserved
 // ======================================================
 
+// ======================================================
+// DYNAMIC NUMBERED POINT BUBBLES
+//
+// Each bubble has its OWN height.
+// Height is calculated from the text length.
+// Long text gets more vertical space.
+// Short text stays compact.
+// Text is top-aligned and kept inside the bubble.
+// ======================================================
+
 function renderNumberPoints(
   page,
   points,
@@ -3071,7 +3081,7 @@ function renderNumberPoints(
     textWidth = 5.2,
     maxPoints = 5,
     startNumber = 1,
-    maxHeight = 4.25,
+    maxHeight = 4.15,
   } = options;
 
 
@@ -3091,104 +3101,53 @@ function renderNumberPoints(
 
 
   // ==================================================
-  // ADAPTIVE VERTICAL LAYOUT
+  // BASIC LAYOUT
   // ==================================================
+
+  const bubbleWidth =
+    textWidth + 0.8;
+
 
   const gap =
     0.10;
 
 
-  const safePoints =
-    normalizedPoints.map(
-      point =>
-        String(
-          point || ""
-        ).trim()
-    );
+  const minBubbleHeight =
+    0.68;
 
 
-  const estimatedCharactersPerLine =
-    textWidth <= 3.5
-      ? 30
-      : textWidth <= 4.2
-        ? 40
-        : 50;
+  const horizontalPadding =
+    0.02;
 
 
-  const desiredHeights =
-    safePoints.map(
-      point => {
-
-        const estimatedLines =
-          Math.max(
-            1,
-            Math.ceil(
-              point.length /
-              estimatedCharactersPerLine
-            )
-          );
+  const topPadding =
+    0.12;
 
 
-        return Math.min(
-          1.20,
-          Math.max(
-            0.70,
-            0.48 +
-            estimatedLines *
-            0.18
-          )
-        );
-
-      }
-    );
-
-
-  const totalGap =
-    Math.max(
-      0,
-      safePoints.length - 1
-    ) * gap;
-
-
-  const desiredContentHeight =
-    desiredHeights.reduce(
-      (sum, height) =>
-        sum + height,
-      0
-    );
-
-
-  const availableContentHeight =
-    Math.max(
-      0,
-      maxHeight - totalGap
-    );
-
-
-  const heightScale =
-    desiredContentHeight >
-    availableContentHeight
-      ? availableContentHeight /
-        desiredContentHeight
-      : 1;
-
-
-  const rowHeights =
-    desiredHeights.map(
-      height =>
-        Math.max(
-          0.64,
-          height * heightScale
-        )
-    );
+  const bottomPadding =
+    0.12;
 
 
   let currentY =
     y;
 
 
+  let usedHeight =
+    0;
+
+
+  // ==================================================
+  // CALCULATE EACH BUBBLE INDEPENDENTLY
+  // ==================================================
+
   normalizedPoints.forEach(
     (point, index) => {
+
+      const text =
+        String(
+          point || ""
+        ).trim();
+
 
       const color =
         COLORS[
@@ -3197,21 +3156,173 @@ function renderNumberPoints(
         ];
 
 
-      const bubbleX =
-        x;
+      // ==================================================
+      // ESTIMATE REALISTIC WRAPPING
+      //
+      // PowerPoint wraps based on available width and
+      // font size, so use a conservative estimate.
+      // ==================================================
+
+      const usableTextWidth =
+        Math.max(
+          2.0,
+          textWidth -
+          0.15
+        );
 
 
-      const bubbleY =
-        currentY;
+      const charactersPerLine =
+        Math.max(
+          18,
+          Math.floor(
+            usableTextWidth *
+            8.5
+          )
+        );
 
 
-      const bubbleWidth =
-        textWidth +
-        0.8;
+      const estimatedLines =
+        Math.max(
+          1,
+          Math.ceil(
+            text.length /
+            charactersPerLine
+          )
+        );
 
 
-      const bubbleHeight =
-        rowHeights[index];
+      // ==================================================
+      // OWN BUBBLE HEIGHT
+      // ==================================================
+
+      let bubbleHeight =
+        minBubbleHeight +
+        (
+          Math.min(
+            estimatedLines,
+            8
+          ) - 1
+        ) *
+        0.22;
+
+
+      // Extra room for long explanations.
+
+      bubbleHeight =
+        Math.max(
+          minBubbleHeight,
+          bubbleHeight
+        );
+
+
+      // ==================================================
+      // FONT SIZE
+      //
+      // Determined separately for this bubble.
+      // ==================================================
+
+      let fontSize =
+        13;
+
+
+      if (
+        estimatedLines >= 7
+      ) {
+
+        fontSize =
+          9.5;
+
+      }
+
+      else if (
+        estimatedLines >= 6
+      ) {
+
+        fontSize =
+          10;
+
+      }
+
+      else if (
+        estimatedLines >= 5
+      ) {
+
+        fontSize =
+          10.5;
+
+      }
+
+      else if (
+        estimatedLines >= 4
+      ) {
+
+        fontSize =
+          11;
+
+      }
+
+      else if (
+        estimatedLines >= 3
+      ) {
+
+        fontSize =
+          11.5;
+
+      }
+
+      else if (
+        estimatedLines === 2
+      ) {
+
+        fontSize =
+          12.5;
+
+      }
+
+
+      // ==================================================
+      // CHECK REMAINING PANEL SPACE
+      // ==================================================
+
+      const remainingHeight =
+        maxHeight -
+        usedHeight;
+
+
+      const remainingPoints =
+        normalizedPoints.length -
+        index;
+
+
+      /*
+       * Reserve enough space for the remaining points.
+       * Only THIS bubble is reduced if necessary.
+       */
+
+      const minimumRemainingHeight =
+        Math.max(
+          0,
+          remainingPoints - 1
+        ) *
+        (
+          minBubbleHeight +
+          gap
+        );
+
+
+      const maximumAvailableForCurrent =
+        Math.max(
+          minBubbleHeight,
+          remainingHeight -
+          minimumRemainingHeight
+        );
+
+
+      bubbleHeight =
+        Math.min(
+          bubbleHeight,
+          maximumAvailableForCurrent
+        );
 
 
       // ==================================================
@@ -3222,10 +3333,10 @@ function renderNumberPoints(
         "roundRect",
         {
           x:
-            bubbleX,
+            x,
 
           y:
-            bubbleY,
+            currentY,
 
           w:
             bubbleWidth,
@@ -3276,26 +3387,24 @@ function renderNumberPoints(
 
 
       // ==================================================
-      // MATCHING VERTICAL LINE
+      // ACCENT LINE
       // ==================================================
 
       page.addShape(
         "roundRect",
         {
           x:
-            bubbleX +
-            0.08,
+            x + 0.08,
 
           y:
-            bubbleY +
-            0.08,
+            currentY + 0.08,
 
           w:
             0.06,
 
           h:
             Math.max(
-              0.12,
+              0.10,
               bubbleHeight -
               0.16
             ),
@@ -3322,16 +3431,13 @@ function renderNumberPoints(
       const circleSize =
         Math.min(
           0.46,
-          Math.max(
-            0.32,
-            bubbleHeight -
-            0.20
-          )
+          bubbleHeight -
+          0.20
         );
 
 
       const circleY =
-        bubbleY +
+        currentY +
         Math.max(
           0.10,
           (
@@ -3345,8 +3451,7 @@ function renderNumberPoints(
         "ellipse",
         {
           x:
-            bubbleX +
-            0.25,
+            x + 0.25,
 
           y:
             circleY,
@@ -3376,16 +3481,11 @@ function renderNumberPoints(
         ),
         {
           x:
-            bubbleX +
-            0.25,
+            x + 0.25,
 
           y:
             circleY +
-            Math.max(
-              0.08,
-              circleSize *
-              0.29
-            ),
+            0.14,
 
           w:
             circleSize,
@@ -3394,9 +3494,7 @@ function renderNumberPoints(
             0.12,
 
           fontSize:
-            circleSize < 0.4
-              ? 9
-              : 11,
+            10.5,
 
           bold:
             true,
@@ -3414,7 +3512,7 @@ function renderNumberPoints(
 
 
       // ==================================================
-      // POINT ICON
+      // CONTEXT ICON
       // ==================================================
 
       const pointIcon =
@@ -3428,13 +3526,12 @@ function renderNumberPoints(
         pointIcon,
         {
           x:
-            bubbleX +
-            0.84,
+            x + 0.84,
 
           y:
-            bubbleY +
+            currentY +
             Math.max(
-              0.13,
+              0.12,
               (
                 bubbleHeight -
                 0.25
@@ -3448,9 +3545,7 @@ function renderNumberPoints(
             0.25,
 
           fontSize:
-            bubbleHeight < 0.75
-              ? 12
-              : 15,
+            13,
 
           bold:
             true,
@@ -3467,46 +3562,39 @@ function renderNumberPoints(
 
 
       // ==================================================
-      // POINT TEXT
+      // TEXT
+      //
+      // IMPORTANT:
+      // Top aligned instead of vertically centered.
+      // This prevents the first lines from escaping.
       // ==================================================
-
-      const pointFontSize =
-        bubbleHeight <= 0.70
-          ? 9.5
-          : bubbleHeight <= 0.82
-            ? 10.5
-            : bubbleHeight <= 0.96
-              ? 11.5
-              : 13.5;
-
 
       page.addText(
         trimText(
-          point,
-          260
+          text,
+          220
         ),
         {
           x:
-            bubbleX +
-            1.3,
+            x + 1.30,
 
           y:
-            bubbleY +
-            0.07,
+            currentY +
+            topPadding,
 
           w:
             bubbleWidth -
-            1.52,
+            1.45,
 
           h:
             Math.max(
-              0.32,
+              0.36,
               bubbleHeight -
-              0.14
+              topPadding -
+              bottomPadding
             ),
 
-          fontSize:
-            pointFontSize,
+          fontSize,
 
           color:
             cleanColor(
@@ -3514,10 +3602,10 @@ function renderNumberPoints(
             ),
 
           valign:
-            "mid",
+            "top",
 
           margin:
-            0,
+            horizontalPadding,
 
           breakLine:
             true,
@@ -3530,14 +3618,22 @@ function renderNumberPoints(
 
       // ==================================================
       // NEXT BUBBLE
+      //
+      // Uses THIS bubble's actual height.
       // ==================================================
 
       currentY +=
         bubbleHeight +
         gap;
 
+
+      usedHeight +=
+        bubbleHeight +
+        gap;
+
     }
   );
+
 }
 
 // ======================================================
@@ -5741,7 +5837,7 @@ function renderCircularFlowStages(
             ),
 
           valign:
-            "mid",
+            "top",
 
           margin:
             0,
@@ -6702,7 +6798,7 @@ async function createSummarySlide(
         "center",
 
       valign:
-        "mid",
+        "top",
 
 
       color:
@@ -6830,6 +6926,16 @@ async function createSummarySlide(
 // SUMMARY MINI CARD
 // ======================================================
 
+// ======================================================
+// DYNAMIC SUMMARY MINI CARD
+//
+// Each summary card adapts independently to its text.
+// Short text  → compact card
+// Long text   → taller card
+//
+// Text always remains inside the card.
+// ======================================================
+
 function addSummaryMiniCard(
 
   page,
@@ -6846,6 +6952,108 @@ function addSummaryMiniCard(
 
 ) {
 
+  const safeText =
+
+    String(
+
+      text ||
+
+      ""
+
+    ).trim();
+
+
+
+  // ====================================================
+  // CARD WIDTH
+  // ====================================================
+
+  const cardWidth =
+    2.85;
+
+
+
+  // ====================================================
+  // TEXT WIDTH
+  // ====================================================
+
+  const textWidth =
+    1.72;
+
+
+
+  // ====================================================
+  // ESTIMATE WRAPPED LINES
+  // ====================================================
+
+  const charactersPerLine =
+    20;
+
+
+
+  const estimatedLines =
+
+    Math.max(
+
+      1,
+
+      Math.ceil(
+
+        safeText.length /
+
+        charactersPerLine
+
+      )
+
+    );
+
+
+
+  // ====================================================
+  // DYNAMIC CARD HEIGHT
+  // ====================================================
+
+  const minHeight =
+    1.30;
+
+
+
+  const maxHeight =
+    2.35;
+
+
+
+  const cardHeight =
+
+    Math.min(
+
+      maxHeight,
+
+      Math.max(
+
+        minHeight,
+
+        0.82 +
+
+        Math.min(
+
+          estimatedLines,
+
+          7
+
+        ) *
+
+        0.20
+
+      )
+
+    );
+
+
+
+  // ====================================================
+  // CARD
+  // ====================================================
 
   page.addShape(
 
@@ -6858,19 +7066,22 @@ function addSummaryMiniCard(
       y,
 
       w:
-        2.85,
+        cardWidth,
 
       h:
-        1.55,
+        cardHeight,
+
 
 
       rectRadius:
         0.07,
 
 
+
       fill: {
 
         color:
+
           cleanColor(
 
             theme.colors.surface ||
@@ -6882,9 +7093,11 @@ function addSummaryMiniCard(
       },
 
 
+
       line: {
 
         color:
+
           "E2E8F0",
 
         width:
@@ -6897,6 +7110,36 @@ function addSummaryMiniCard(
   );
 
 
+
+  // ====================================================
+  // CHECK CIRCLE
+  // ====================================================
+
+  const circleSize =
+    0.42;
+
+
+
+  const circleY =
+
+    y +
+
+    Math.max(
+
+      0.18,
+
+      (
+
+        cardHeight -
+
+        circleSize
+
+      ) / 2
+
+    );
+
+
+
   page.addShape(
 
     "ellipse",
@@ -6907,13 +7150,14 @@ function addSummaryMiniCard(
         x + 0.25,
 
       y:
-        y + 0.48,
+        circleY,
 
       w:
-        0.42,
+        circleSize,
 
       h:
-        0.42,
+        circleSize,
+
 
 
       fill: {
@@ -6922,6 +7166,7 @@ function addSummaryMiniCard(
           accent,
 
       },
+
 
 
       line: {
@@ -6936,6 +7181,11 @@ function addSummaryMiniCard(
   );
 
 
+
+  // ====================================================
+  // CHECK ICON
+  // ====================================================
+
   page.addText(
 
     "✓",
@@ -6946,13 +7196,14 @@ function addSummaryMiniCard(
         x + 0.25,
 
       y:
-        y + 0.58,
+        circleY + 0.09,
 
       w:
-        0.42,
+        circleSize,
 
       h:
         0.12,
+
 
 
       fontSize:
@@ -6962,12 +7213,15 @@ function addSummaryMiniCard(
         true,
 
 
+
       align:
         "center",
 
 
+
       color:
         "FFFFFF",
+
 
 
       margin:
@@ -6978,50 +7232,137 @@ function addSummaryMiniCard(
   );
 
 
+
+  // ====================================================
+  // ADAPTIVE FONT SIZE
+  // ====================================================
+
+  let fontSize =
+    14;
+
+
+
+  if (
+
+    estimatedLines >= 6
+
+  ) {
+
+    fontSize =
+      9.5;
+
+  }
+
+  else if (
+
+    estimatedLines >= 5
+
+  ) {
+
+    fontSize =
+      10.5;
+
+  }
+
+  else if (
+
+    estimatedLines >= 4
+
+  ) {
+
+    fontSize =
+      11;
+
+  }
+
+  else if (
+
+    estimatedLines >= 3
+
+  ) {
+
+    fontSize =
+      12;
+
+  }
+
+  else if (
+
+    estimatedLines === 2
+
+  ) {
+
+    fontSize =
+      13;
+
+  }
+
+
+
+  // ====================================================
+  // TEXT
+  //
+  // IMPORTANT:
+  // Top aligned so the first line always starts inside
+  // the card.
+  // ====================================================
+
   page.addText(
 
     trimText(
 
-      text,
+      safeText,
 
-      105
+      180
 
     ),
 
     {
 
       x:
-        x + 0.9,
+        x + 0.88,
 
       y:
-        y + 0.35,
+        y + 0.20,
 
       w:
-        1.65,
+        textWidth,
 
       h:
-        0.72,
+        cardHeight - 0.35,
 
 
-      fontSize:
-        14,
+
+      fontSize,
 
       bold:
         true,
 
 
+
       valign:
-        "mid",
+        "top",
+
 
 
       color:
+
         cleanColor(
+
           theme.colors.text
+
         ),
 
 
+
       margin:
-        0,
+        0.02,
+
+
+
+      breakLine:
+        true,
+
 
 
       fit:

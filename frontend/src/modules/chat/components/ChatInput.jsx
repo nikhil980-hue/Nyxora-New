@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -33,6 +34,37 @@ export default function ChatInput({
     setMessage,
   ] = useState("");
 
+  const textareaRef =
+  useRef(null);
+
+  useEffect(() => {
+
+  const textarea =
+    textareaRef.current;
+
+  if (!textarea) {
+    return;
+  }
+
+  textarea.style.height =
+    "auto";
+
+  const maxHeight =
+    220;
+
+  textarea.style.height =
+    `${Math.min(
+      textarea.scrollHeight,
+      maxHeight
+    )}px`;
+
+  textarea.style.overflowY =
+    textarea.scrollHeight >
+    maxHeight
+      ? "auto"
+      : "hidden";
+
+}, [message]);
 
   const [
     selectedFiles,
@@ -1173,6 +1205,7 @@ export default function ChatInput({
         {/* MESSAGE */}
 
         <textarea
+        ref={textareaRef}
           rows={1}
 
           value={
@@ -1250,21 +1283,24 @@ export default function ChatInput({
 
           }}
 
-          className="
-            flex-1
-            resize-none
-            rounded-2xl
-            border
-            border-slate-700
-            bg-[#111827]
-            px-4
-            py-3
-            text-white
-            outline-none
-            transition
-            placeholder:text-gray-500
-            focus:border-violet-500
-          "
+className="
+  min-h-[48px]
+  max-h-[220px]
+  flex-1
+  resize-none
+  overflow-y-auto
+  rounded-2xl
+  border
+  border-slate-700
+  bg-[#111827]
+  px-4
+  py-3
+  text-white
+  outline-none
+  transition
+  placeholder:text-gray-500
+  focus:border-violet-500
+"
         />
 
 

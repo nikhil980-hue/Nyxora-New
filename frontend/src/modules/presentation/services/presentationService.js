@@ -60,21 +60,30 @@ export async function generatePresentation({
   customPrompt = "",
 
 
+  presentationMode = "concise",
+
+
 
 }) {
 
 
   // ======================================================
-  // USER REQUEST DETAIL MODE
+  // EXPLICIT PRESENTATION MODE
   // ======================================================
-  // Explicit requests for detail override the normal
-  // concise presentation style.
+  // The UI now controls the content depth directly.
+  //
+  // concise  → short presentation-friendly content
+  // detailed → in-depth educational explanation
   // ======================================================
 
+  const normalizedPresentationMode =
+    presentationMode === "detailed"
+      ? "detailed"
+      : "concise";
+
+
   const detailMode =
-    isDetailedPresentationRequest(
-      customPrompt
-    );
+    normalizedPresentationMode === "detailed";
 
 
 
@@ -104,6 +113,9 @@ export async function generatePresentation({
       customPrompt,
 
       detailMode,
+
+      presentationMode:
+        normalizedPresentationMode,
 
 
 
@@ -198,6 +210,8 @@ function buildPresentationPrompt({
 
   detailMode,
 
+  presentationMode,
+
 
 
 }) {
@@ -261,9 +275,13 @@ content depth and explanation style.
 
 
 
-REQUEST MODE:
+PRESENTATION MODE:
 
-${detailMode ? "DETAILED MODE" : "STANDARD MODE"}
+${
+  presentationMode === "detailed"
+    ? "DETAILED MODE"
+    : "CONCISE MODE"
+}
 
 
 
@@ -277,11 +295,22 @@ ${
 
 
 
-IMPORTANT MODE OVERRIDE:
+IMPORTANT MODE RULES:
 
-If REQUEST MODE is DETAILED MODE:
+If PRESENTATION MODE is CONCISE MODE:
 
-- The presentation must actually TEACH and EXPLAIN the topic.
+- Keep the presentation concise, cinematic, and easy to scan.
+- Prefer short supporting text and compact points.
+- Do not add long explanatory paragraphs unless essential.
+- Focus on the most important concepts, visuals, and takeaways.
+- Keep the amount of text appropriate for presentation viewing.
+- Avoid unnecessary repetition.
+
+
+
+If PRESENTATION MODE is DETAILED MODE:
+
+- The presentation MUST actually TEACH and EXPLAIN the topic in depth.
 - Do not merely summarize the topic with keywords.
 - Use complete explanatory sentences.
 - Explain what the concept is, how it works, why it works,
@@ -291,6 +320,15 @@ If REQUEST MODE is DETAILED MODE:
   placeholder phrases.
 - Use enough content across the slides to make the topic
   understandable to someone learning it for the first time.
+- Do not compress complex concepts into one-line summaries.
+- Distribute related information across the available slides.
+- Include definitions where appropriate.
+- Include mechanisms and working principles where appropriate.
+- Include practical or realistic examples where appropriate.
+- Include step-by-step explanations for processes.
+- Include applications and significance where relevant.
+- Explain relationships between major ideas.
+- Preserve factual accuracy.
 - Do not use comparison, before/after, dichotomy, or split-card
   storytelling unless the user explicitly requested comparison.
 - Do not invent a "Before" and "After" concept merely because
@@ -330,20 +368,32 @@ Do NOT create:
 
 IMPORTANT:
 
-If the user explicitly asks for detailed,
-elaborate, comprehensive, extensive,
-step-by-step, in-depth, full, or expanded
-explanation, the user's requested depth takes
-priority over the default concise presentation
-style.
+The selected PRESENTATION MODE controls content depth.
+The mode is an explicit user choice and must be followed.
 
-In detailed mode, the presentation may contain
-longer supporting text, explanatory sentences,
-multiple meaningful points, examples, reasoning,
-and additional context where useful.
+
+
+CONCISE MODE:
+
+The presentation should be concise enough
+to scan quickly while still communicating
+the important information correctly.
+
+
+
+DETAILED MODE:
+
+The presentation must contain enough educational
+content to genuinely explain the topic.
 
 Do not artificially shorten educational content
 just to satisfy the default cinematic style.
+
+Minimal visual design does NOT mean minimal
+educational content.
+
+The design should remain clean while the information
+depth follows the selected mode.
 
 
 
@@ -354,7 +404,7 @@ RULE 2:
 Every slide must communicate ONE main idea.
 
 A slide may explain that idea in enough detail
-to satisfy the user's request.
+to satisfy the selected presentation mode.
 
 Do not merge unrelated ideas just to reduce
 the slide count.
@@ -365,17 +415,19 @@ the slide count.
 
 RULE 3:
 
-CONTENT DEPTH IS ADAPTIVE.
+CONTENT DEPTH IS CONTROLLED BY PRESENTATION MODE.
 
 
 
-DEFAULT / CONCISE MODE:
+CONCISE MODE:
 
 - Keep titles short.
 - Keep supporting text concise.
 - Prefer 3–5 meaningful points.
 - Keep each point presentation-friendly.
 - Avoid unnecessary paragraphs.
+- Focus on essential concepts.
+- Prefer short explanations over long prose.
 
 
 
@@ -383,25 +435,26 @@ DETAILED MODE:
 
 - Do not force points into short fragments.
 - Use complete explanatory sentences.
-- Use 4–6 meaningful points where appropriate.
+- Use 4–7 meaningful points where appropriate.
 - Each point should explain an actual idea, not a label.
 - Include definitions, mechanisms, reasoning, examples,
   applications, relationships, and step-by-step detail.
 - Explain WHY and HOW, not only WHAT.
-- Avoid generic filler such as "important factors",
-  "key characteristics", or "state and conditions".
-- Never replace missing knowledge with placeholder text.
+- Include concrete examples or realistic scenarios when useful.
 - Use the available slide count to distribute the explanation
   across the topic logically.
-- Keep the visual hierarchy clean while allowing the content
-  to be genuinely detailed.
+- Do not compress a multi-part concept into one short slide.
+- Use explanatory paragraphs when they improve understanding.
+- Use descriptive process steps when useful.
+- Make each slide contribute new understanding.
+- Avoid repeating the same explanation on multiple slides.
+- Preserve clear visual hierarchy even with detailed content.
 
 
 
 The goal is NOT to make every presentation long.
 
-The goal is to follow the user's requested level
-of explanation.
+The goal is to follow the user's selected content depth.
 
 
 
@@ -507,18 +560,25 @@ Explain one important idea.
 
 Rules:
 
-DEFAULT MODE:
-- Avoid definition paragraphs.
-- Use metaphor or visual explanation.
+CONCISE MODE:
+
+- Avoid definition paragraphs unless essential.
 - Use concise supporting words.
+- Focus on the main takeaway.
+- Use compact explanatory statements.
+
+
 
 DETAILED MODE:
+
 - Definitions and explanatory paragraphs are allowed
   when they improve understanding.
-- Include clear explanation, examples, or context
-  when requested.
+- Include clear explanation, examples, or context.
+- Explain mechanisms and relationships.
 - Prefer meaningful complete statements over
   artificial 3-word fragments.
+- Use enough detail to teach the concept, not just name it.
+- Avoid replacing explanations with generic labels.
 
 
 
@@ -574,15 +634,20 @@ Explain transformation or flow.
 
 Rules:
 
-DEFAULT MODE:
+CONCISE MODE:
+
 - Maximum 5 steps.
 - Short labels.
 - Clear movement.
 
+
+
 DETAILED MODE:
+
 - Up to 7 meaningful steps when needed.
 - Step labels may be descriptive.
 - Include short explanations with steps when useful.
+- Explain what happens at each stage.
 - Preserve clear visual progression.
 
 
@@ -688,6 +753,23 @@ End with memorable message.
 
 
 
+CONCISE MODE:
+
+- Keep the summary brief.
+- Highlight the main takeaway.
+
+
+
+DETAILED MODE:
+
+- Summarize the most important concepts learned.
+- Reinforce the central relationship or process.
+- End with a useful educational takeaway.
+
+
+
+
+
 Structure:
 
 
@@ -784,21 +866,31 @@ FORBIDDEN OUTPUT
 
 
 
-DEFAULT PRESENTATION MODE:
+CONCISE MODE:
 
 Avoid:
 
-- unnecessary 5+ point lists
-- long explanations when not requested
+- unnecessary long explanations
 - large blocks of text
+- repetitive explanations
+- unnecessary 5+ point lists
 - Wikipedia-style content
 
 
 
 DETAILED MODE:
 
-The following are REQUIRED when relevant to the user's
-detailed request:
+Do NOT:
+
+- reduce detailed concepts to keywords
+- replace explanations with generic labels
+- repeat the same idea merely to increase length
+- add unsupported facts
+- use filler text just to make slides longer
+
+
+
+DETAILED MODE MUST INCLUDE WHEN RELEVANT:
 
 - longer explanations
 - complete sentences
@@ -810,9 +902,17 @@ detailed request:
 - mechanisms / working
 - applications
 - expanded educational context
+- relationships between concepts
 
-Do NOT confuse "minimal visual design" with "minimal
-educational content".
+
+
+Do NOT confuse:
+
+"minimal visual design"
+
+with:
+
+"minimal educational content".
 
 
 
@@ -861,12 +961,18 @@ RETURN JSON ONLY.
 Before returning JSON, internally verify:
 
 1. The requested topic is the actual topic of every slide.
-2. If DETAILED MODE is active, the content genuinely explains
+2. The selected presentation mode has been followed.
+3. If DETAILED MODE is active, the content genuinely teaches
    the topic rather than merely listing keywords.
-3. No comparison/before-after slide exists unless explicitly
+4. If CONCISE MODE is active, unnecessary long explanations
+   have not been added.
+5. No comparison/before-after slide exists unless explicitly
    requested.
-4. No generic placeholder text is used as educational content.
-5. The slide sequence teaches the topic logically.
+6. No generic placeholder text is used as educational content.
+7. The slide sequence teaches the topic logically.
+8. Each slide contributes new information.
+9. The content is factually coherent.
+10. The presentation contains exactly the requested slide count.
 
 
 
@@ -947,6 +1053,8 @@ Required JSON format:
 
 `;
 }
+
+
 // ======================================================
 // PARSE PRESENTATION RESPONSE
 // ======================================================
@@ -1182,7 +1290,7 @@ function normalizeSlides(
         ),
 
 
-        layout:
+      layout:
 
 
         convertLayout(
@@ -1358,6 +1466,7 @@ function normalizeSlides(
 // COMPARISON REQUEST DETECTION
 // ======================================================
 
+
 function isComparisonRequested(
 
   customPrompt
@@ -1387,16 +1496,27 @@ function isComparisonRequested(
   const comparisonPatterns = [
 
     /\bcompare\b/,
+
     /\bcomparison\b/,
+
     /\bcontrast\b/,
+
     /\bdifference\b/,
+
     /\bdifferences\b/,
+
     /\bbefore\s+and\s+after\b/,
+
     /\bbefore\/after\b/,
+
     /\bpros\s+and\s+cons\b/,
+
     /\badvantages\s+and\s+disadvantages\b/,
+
     /\bversus\b/,
+
     /\bvs\.?\b/,
+
     /\bdichotomy\b/,
 
   ];
@@ -1421,6 +1541,7 @@ function isComparisonRequested(
 // ======================================================
 // SANITIZE AI SLIDE TYPE
 // ======================================================
+
 
 function sanitizeSlideType(
 
@@ -1485,6 +1606,7 @@ function sanitizeSlideType(
 // NORMALIZE SLIDE POINTS
 // ======================================================
 
+
 function getNormalizedSlidePoints(
 
   slide,
@@ -1544,9 +1666,13 @@ function getNormalizedSlidePoints(
   const groups = [
 
     slide.points,
+
     slide.leftPoints,
+
     slide.rightPoints,
+
     slide.beforePoints,
+
     slide.afterPoints,
 
   ];
@@ -1573,7 +1699,9 @@ function getNormalizedSlidePoints(
             if(
 
               item !== null &&
+
               item !== undefined &&
+
               String(item).trim()
 
             ){
@@ -1605,7 +1733,6 @@ function getNormalizedSlidePoints(
 
 // ======================================================
 // CONVERT AI TYPE TO PPT LAYOUT
-// ======================================================
 // ======================================================
 
 
@@ -1734,7 +1861,11 @@ function cleanText(
 
 // ======================================================
 // DETECT DETAILED PRESENTATION REQUEST
+//
+// Kept as a fallback for older callers that may not yet
+// provide presentationMode.
 // ======================================================
+
 
 function isDetailedPresentationRequest(
 
@@ -1837,6 +1968,7 @@ function isDetailedPresentationRequest(
 // LIMIT POINTS
 // ======================================================
 
+
 function limitPoints(
 
   points,
@@ -1864,7 +1996,7 @@ function limitPoints(
 
     detailed
 
-      ? 6
+      ? 7
 
       : 3;
 
@@ -1873,7 +2005,7 @@ function limitPoints(
 
     detailed
 
-      ? 260
+      ? 700
 
       : 35;
 

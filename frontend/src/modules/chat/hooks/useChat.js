@@ -3111,6 +3111,120 @@ if (
 
       }
 
+      // ================================================
+// TEST GENERATOR REGENERATE PROTECTION
+// ================================================
+//
+// If the user asked for a test while currently in
+// Normal Assistant or another non-test mode,
+// regeneration must NOT generate the test.
+//
+// It must show the same warning and tell the user
+// to select Test Generator mode.
+// ================================================
+
+const isTestRequest =
+  /(?:\bmake\b|\bcreate\b|\bgenerate\b|\bprepare\b|\bgive\b|\bwrite\b|\bset\b).{0,80}\btest\b/i.test(
+    cleanUserMessage
+  ) ||
+  /\bquestion\s*paper\b/i.test(
+    cleanUserMessage
+  ) ||
+  /\bquestionnaire\b/i.test(
+    cleanUserMessage
+  ) ||
+  /\bassessment\b/i.test(
+    cleanUserMessage
+  ) ||
+  /\bexam\s*paper\b/i.test(
+    cleanUserMessage
+  );
+
+
+const isTestGeneratorMode =
+  selectedMode === "test";
+
+
+if (
+  isTestRequest &&
+  !isTestGeneratorMode
+) {
+
+  const TEST_GENERATOR_WARNING = `
+## Test Generator Mode
+
+This request is for generating a test.
+
+Please select **Test Generator** mode from the assistant mode selector before generating a test.
+
+Example:
+
+**Test Generator → Generate a Class 8 Mathematics test on Linear Equations.**
+
+`.trim();
+
+
+  const updatedMessages =
+    messages.map(
+      (msg) =>
+        msg.id ===
+        lastAssistant.id
+
+          ? {
+              ...msg,
+
+              message:
+                TEST_GENERATOR_WARNING,
+
+              pdfRequested:
+                false,
+
+              pdfModeWarning:
+                false,
+
+              testModeWarning:
+                true,
+
+              testGeneratorMode:
+                false,
+            }
+
+          : msg
+    );
+
+
+  setChats(
+    (prev) =>
+      prev.map(
+        (chat) =>
+          chat.id ===
+          activeChatId
+
+            ? {
+                ...chat,
+
+                messages:
+                  updatedMessages,
+              }
+
+            : chat
+      )
+  );
+
+
+  await saveMessages(
+    activeChatId,
+    updatedMessages
+  );
+
+  stopThinking();
+
+setIsThinking(false);
+
+
+  return true;
+}
+
 
       let memory =
         null;
