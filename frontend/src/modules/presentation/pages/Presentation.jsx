@@ -3,6 +3,7 @@ import {
   Sparkles,
   AlertCircle,
   Download,
+  Loader2,
 } from "lucide-react";
 
 
@@ -63,6 +64,16 @@ export default function Presentation() {
   const [
     loading,
     setLoading,
+  ] = useState(false);
+
+
+  // ====================================================
+  // EXPORT STATE
+  // ====================================================
+
+  const [
+    exporting,
+    setExporting,
   ] = useState(false);
 
 
@@ -283,10 +294,11 @@ export default function Presentation() {
   // EXPORT PRESENTATION
   // ====================================================
 
-  function handleExport() {
+  async function handleExport() {
 
     if (
-      slides.length === 0
+      slides.length === 0 ||
+      exporting
     ) {
 
       return;
@@ -294,20 +306,59 @@ export default function Presentation() {
     }
 
 
-    exportPresentationToPpt({
+    try {
 
-      presentation: {
+      setExporting(true);
+      setError("");
 
-        title,
 
-        slides,
+      await exportPresentationToPpt({
 
-      },
+        presentation: {
 
-      themeName:
-        DEFAULT_PRESENTATION_THEME,
+          title,
 
-    });
+          slides,
+
+        },
+
+
+        themeName:
+
+          DEFAULT_PRESENTATION_THEME,
+
+      });
+
+    }
+
+
+    catch (error) {
+
+      console.error(
+
+        "Presentation export failed:",
+
+        error
+
+      );
+
+
+      setError(
+
+        error?.message ||
+
+        "Unable to export presentation."
+
+      );
+
+    }
+
+
+    finally {
+
+      setExporting(false);
+
+    }
 
   }
 
@@ -736,7 +787,8 @@ export default function Presentation() {
                       handleExport
                     }
                     disabled={
-                      slides.length === 0
+                      slides.length === 0 ||
+                      exporting
                     }
                     className="
                       group/export
@@ -764,7 +816,8 @@ export default function Presentation() {
                       hover:-translate-y-[1px]
                       hover:shadow-[0_0_30px_rgba(139,92,246,0.26)]
                       disabled:cursor-not-allowed
-                      disabled:opacity-50
+                      disabled:opacity-60
+                      disabled:saturate-75
                       disabled:hover:translate-y-0
                     "
                   >
@@ -788,13 +841,28 @@ export default function Presentation() {
                     />
 
 
-                    <Download
-                      size={15}
-                      className="
-                        relative
-                        z-10
-                      "
-                    />
+                    {exporting ? (
+
+                      <Loader2
+                        size={15}
+                        className="
+                          relative
+                          z-10
+                          animate-spin
+                        "
+                      />
+
+                    ) : (
+
+                      <Download
+                        size={15}
+                        className="
+                          relative
+                          z-10
+                        "
+                      />
+
+                    )}
 
 
                     <span
@@ -803,7 +871,9 @@ export default function Presentation() {
                         z-10
                       "
                     >
-                      Export PPTX
+                      {exporting
+                        ? "Exporting..."
+                        : "Export PPTX"}
                     </span>
 
                   </button>

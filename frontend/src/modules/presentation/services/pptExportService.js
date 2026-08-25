@@ -2453,11 +2453,14 @@ async function createContentSlide(
         y:
           1.95,
 
-        textWidth:
-          3.35,
+textWidth:
+  3.35,
 
-        maxPoints:
-          5,
+maxPoints:
+  5,
+
+maxHeight:
+  4.15,
 
       }
 
@@ -2562,12 +2565,14 @@ async function createContentSlide(
         y:
           1.95,
 
-        textWidth:
-          4.95,
+textWidth:
+  4.95,
 
-        maxPoints:
-          5,
+maxPoints:
+  5,
 
+maxHeight:
+  4.15,
       }
 
     );
@@ -2665,11 +2670,14 @@ async function createContentSlide(
       y:
         1.95,
 
-      textWidth:
-        4.55,
+textWidth:
+  4.55,
 
-      maxPoints:
-        5,
+maxPoints:
+  5,
+
+maxHeight:
+  4.15,
 
     }
 
@@ -3037,18 +3045,33 @@ function addSmallInsightCard(
 // ✓ Consistent connected visual system
 // ======================================================
 
+// ======================================================
+// NUMBERED POINT BUBBLE SYSTEM
+//
+// ADAPTIVE VERSION
+//
+// ✓ Bubble height adapts to text
+// ✓ Text remains inside bubble
+// ✓ Total point group stays inside parent panel
+// ✓ Numbering preserved
+// ✓ Icons preserved
+// ✓ Existing colors/theme preserved
+// ======================================================
+
 function renderNumberPoints(
   page,
   points,
   theme,
   options = {}
 ) {
+
   const {
     x = 0.8,
     y = 1.8,
     textWidth = 5.2,
     maxPoints = 5,
     startNumber = 1,
+    maxHeight = 4.25,
   } = options;
 
 
@@ -3060,13 +3083,112 @@ function renderNumberPoints(
       );
 
 
+  if (
+    normalizedPoints.length === 0
+  ) {
+    return;
+  }
+
+
+  // ==================================================
+  // ADAPTIVE VERTICAL LAYOUT
+  // ==================================================
+
+  const gap =
+    0.10;
+
+
+  const safePoints =
+    normalizedPoints.map(
+      point =>
+        String(
+          point || ""
+        ).trim()
+    );
+
+
+  const estimatedCharactersPerLine =
+    textWidth <= 3.5
+      ? 30
+      : textWidth <= 4.2
+        ? 40
+        : 50;
+
+
+  const desiredHeights =
+    safePoints.map(
+      point => {
+
+        const estimatedLines =
+          Math.max(
+            1,
+            Math.ceil(
+              point.length /
+              estimatedCharactersPerLine
+            )
+          );
+
+
+        return Math.min(
+          1.20,
+          Math.max(
+            0.70,
+            0.48 +
+            estimatedLines *
+            0.18
+          )
+        );
+
+      }
+    );
+
+
+  const totalGap =
+    Math.max(
+      0,
+      safePoints.length - 1
+    ) * gap;
+
+
+  const desiredContentHeight =
+    desiredHeights.reduce(
+      (sum, height) =>
+        sum + height,
+      0
+    );
+
+
+  const availableContentHeight =
+    Math.max(
+      0,
+      maxHeight - totalGap
+    );
+
+
+  const heightScale =
+    desiredContentHeight >
+    availableContentHeight
+      ? availableContentHeight /
+        desiredContentHeight
+      : 1;
+
+
+  const rowHeights =
+    desiredHeights.map(
+      height =>
+        Math.max(
+          0.64,
+          height * heightScale
+        )
+    );
+
+
+  let currentY =
+    y;
+
+
   normalizedPoints.forEach(
     (point, index) => {
-
-      const currentY =
-        y +
-        index * 0.82;
-
 
       const color =
         COLORS[
@@ -3089,7 +3211,7 @@ function renderNumberPoints(
 
 
       const bubbleHeight =
-        0.68;
+        rowHeights[index];
 
 
       // ==================================================
@@ -3111,10 +3233,8 @@ function renderNumberPoints(
           h:
             bubbleHeight,
 
-
           rectRadius:
             0.07,
-
 
           fill: {
             color:
@@ -3124,7 +3244,6 @@ function renderNumberPoints(
               ),
           },
 
-
           line: {
             color:
               "E2E8F0",
@@ -3132,7 +3251,6 @@ function renderNumberPoints(
             width:
               0.8,
           },
-
 
           shadow: {
             type:
@@ -3165,26 +3283,29 @@ function renderNumberPoints(
         "roundRect",
         {
           x:
-            bubbleX + 0.08,
+            bubbleX +
+            0.08,
 
           y:
-            bubbleY + 0.08,
+            bubbleY +
+            0.08,
 
           w:
             0.06,
 
           h:
-            bubbleHeight - 0.16,
-
+            Math.max(
+              0.12,
+              bubbleHeight -
+              0.16
+            ),
 
           rectRadius:
             0.025,
 
-
           fill: {
             color,
           },
-
 
           line: {
             transparency:
@@ -3195,29 +3316,50 @@ function renderNumberPoints(
 
 
       // ==================================================
-      // NUMBER CIRCLE — NOW INSIDE BUBBLE
+      // NUMBER CIRCLE
       // ==================================================
+
+      const circleSize =
+        Math.min(
+          0.46,
+          Math.max(
+            0.32,
+            bubbleHeight -
+            0.20
+          )
+        );
+
+
+      const circleY =
+        bubbleY +
+        Math.max(
+          0.10,
+          (
+            bubbleHeight -
+            circleSize
+          ) / 2
+        );
+
 
       page.addShape(
         "ellipse",
         {
           x:
-            bubbleX + 0.25,
+            bubbleX +
+            0.25,
 
           y:
-            bubbleY + 0.11,
+            circleY,
 
           w:
-            0.46,
+            circleSize,
 
           h:
-            0.46,
-
+            circleSize,
 
           fill: {
             color,
           },
-
 
           line: {
             transparency:
@@ -3234,28 +3376,33 @@ function renderNumberPoints(
         ),
         {
           x:
-            bubbleX + 0.25,
+            bubbleX +
+            0.25,
 
           y:
-            bubbleY + 0.225,
+            circleY +
+            Math.max(
+              0.08,
+              circleSize *
+              0.29
+            ),
 
           w:
-            0.46,
+            circleSize,
 
           h:
             0.12,
 
-
           fontSize:
-            11,
+            circleSize < 0.4
+              ? 9
+              : 11,
 
           bold:
             true,
 
-
           color:
             "FFFFFF",
-
 
           align:
             "center",
@@ -3281,10 +3428,18 @@ function renderNumberPoints(
         pointIcon,
         {
           x:
-            bubbleX + 0.84,
+            bubbleX +
+            0.84,
 
           y:
-            bubbleY + 0.19,
+            bubbleY +
+            Math.max(
+              0.13,
+              (
+                bubbleHeight -
+                0.25
+              ) / 2
+            ),
 
           w:
             0.34,
@@ -3292,16 +3447,15 @@ function renderNumberPoints(
           h:
             0.25,
 
-
           fontSize:
-            15,
+            bubbleHeight < 0.75
+              ? 12
+              : 15,
 
           bold:
             true,
 
-
           color,
-
 
           align:
             "center",
@@ -3316,34 +3470,48 @@ function renderNumberPoints(
       // POINT TEXT
       // ==================================================
 
+      const pointFontSize =
+        bubbleHeight <= 0.70
+          ? 9.5
+          : bubbleHeight <= 0.82
+            ? 10.5
+            : bubbleHeight <= 0.96
+              ? 11.5
+              : 13.5;
+
+
       page.addText(
         trimText(
           point,
-          155
+          260
         ),
         {
           x:
-            bubbleX + 1.3,
+            bubbleX +
+            1.3,
 
           y:
-            bubbleY + 0.1,
+            bubbleY +
+            0.07,
 
           w:
-            bubbleWidth - 1.52,
+            bubbleWidth -
+            1.52,
 
           h:
-            bubbleHeight - 0.2,
-
+            Math.max(
+              0.32,
+              bubbleHeight -
+              0.14
+            ),
 
           fontSize:
-            13.5,
-
+            pointFontSize,
 
           color:
             cleanColor(
               theme.colors.text
             ),
-
 
           valign:
             "mid",
@@ -3351,14 +3519,27 @@ function renderNumberPoints(
           margin:
             0,
 
+          breakLine:
+            true,
+
           fit:
             "shrink",
         }
       );
 
+
+      // ==================================================
+      // NEXT BUBBLE
+      // ==================================================
+
+      currentY +=
+        bubbleHeight +
+        gap;
+
     }
   );
 }
+
 // ======================================================
 // SMART POINT ICON
 //
