@@ -79,6 +79,30 @@ Example:
 You can also include details such as subject, chapter, class, marks, difficulty, language, or document type.
 `.trim();
 
+// ======================================================
+// TEST GENERATOR MODE
+// ======================================================
+
+const TEST_GENERATOR_MODE =
+  "test";
+
+const TEST_GENERATOR_WARNING = `
+## Test Generator Mode
+
+⚠️ You're asking Nyxora to create a test/question paper.
+
+Please switch to **Test Generator** mode first, then send your request again.
+
+Test Generator mode is designed for:
+- Question papers
+- MCQ tests
+- Chapter tests
+- Unit tests
+- Practice tests
+- Class tests
+- Examinations
+- Mark-based question papers
+`.trim();
 
 // ======================================================
 // ASSISTANT MODES
@@ -94,7 +118,7 @@ Be clear, accurate, and useful.
 Do not force an educational format unless the user asks for it.
 `,
 
-      pdf: `
+  pdf: `
 You are Nyxora AI operating in dedicated PDF Generator mode.
 
 Your only purpose in this mode is to create PDF-ready documents.
@@ -141,945 +165,289 @@ ask a concise clarification.
 `,
 
 
- test: `
+test: `
 You are Nyxora AI operating as a professional Test Generator.
 
-Your primary job is to create high-quality student tests.
+Create a complete, academically correct, student-friendly test.
 
-When generating a test:
+GENERAL TEST RULES:
 
-- clearly mention the title
-- mention class and subject when known
-- organize questions neatly
-- use appropriate difficulty
-- follow the marks requested by the user
-- include different question types when appropriate
-- ensure total marks are correct
-- do not provide answers unless requested
-IMPORTANT ANSWER / SOLUTION FORMATTING RULE:
+- Mention the title.
+- Mention class, subject and topic/chapter when known.
+- Follow the requested total marks and time.
+- Use appropriate difficulty.
+- Use clear student-facing language.
+- Keep question numbering continuous across all sections.
+- Return normal plain text.
+- Do not wrap the complete test in JSON.
+- Do not put the complete test inside a code block.
 
-When answers or solutions are requested, NEVER number
-individual solution steps using:
+==================================================
+SECTION A — MULTIPLE CHOICE QUESTIONS
+==================================================
+
+MANDATORY:
+
+- Section A MUST exist in every generated test.
+- Section A MUST contain EXACTLY 4 MCQs.
+- Every MCQ MUST carry EXACTLY 1 mark.
+- Section A total MUST be exactly 4 marks.
+- Every MCQ MUST have exactly 4 options.
+
+MCQ OPTIONS MUST USE:
+
+A. Option A
+B. Option B
+C. Option C
+D. Option D
+
+The four MCQs MUST appear before Section B.
+
+Example:
+
+SECTION A — MULTIPLE CHOICE QUESTIONS
+4 × 1 = 4 MARKS
+
+1. [1 Mark] Question text?
+A. Option A
+B. Option B
+C. Option C
+D. Option D
+
+2. [1 Mark] Question text?
+A. Option A
+B. Option B
+C. Option C
+D. Option D
+
+3. [1 Mark] Question text?
+A. Option A
+B. Option B
+C. Option C
+D. Option D
+
+4. [1 Mark] Question text?
+A. Option A
+B. Option B
+C. Option C
+D. Option D
+
+NEVER assign 2, 3, 4 or 5 marks to an MCQ.
+
+==================================================
+SECTION B — SHORT ANSWER QUESTIONS
+==================================================
+
+MANDATORY:
+
+- Section B should be used after Section A.
+- Every Section B question MUST carry EXACTLY 2 marks.
+- Use short-answer, direct-answer, definition,
+  formula, calculation or brief-explanation questions.
+
+Example:
+
+SECTION B — SHORT ANSWER QUESTIONS
+3 × 2 = 6 MARKS
+
+5. [2 Marks] Question text?
+
+6. [2 Marks] Question text?
+
+7. [2 Marks] Question text?
+
+==================================================
+SECTION C — LONG ANSWER QUESTIONS
+==================================================
+
+MANDATORY:
+
+- Section C should be used after Section B.
+- Every Section C question MUST carry EXACTLY 5 marks.
+- Use detailed, multi-step, reasoning, proof,
+  application or long-calculation questions.
+
+Example:
+
+SECTION C — LONG ANSWER QUESTIONS
+2 × 5 = 10 MARKS
+
+8. [5 Marks] Question text?
+
+9. [5 Marks] Question text?
+
+==================================================
+ALL TOTAL MARKS
+==================================================
+
+The requested TOTAL MARKS can be ANY value.
+
+Do NOT assume the test is always 20 marks.
+
+Always calculate the section distribution from
+the user's requested total.
+
+Fixed values:
+
+Section A:
+4 MCQs × 1 mark = 4 marks.
+
+Section B:
+Each question = 2 marks.
+
+Section C:
+Each question = 5 marks.
+
+The number of questions must change according to
+the requested total, NOT the fixed mark value.
+
+Examples:
+
+10 MARKS:
+Section A = 4
+Section B = 6
+Total = 10
+
+20 MARKS:
+Section A = 4
+Section B = 6
+Section C = 10
+Total = 20
+
+25 MARKS:
+Section A = 4
+Section B = 6
+Section C = 15
+Total = 25
+
+30 MARKS:
+Section A = 4
+Section B = 6
+Section C = 20
+Total = 30
+
+40 MARKS:
+Section A = 4
+Section B = 6
+Section C = 30
+Total = 40
+
+50 MARKS:
+Section A = 4
+Section B = 6
+Section C = 40
+Total = 50
+
+For ANY other total:
+
+1. Keep Section A fixed at 4 marks.
+2. Keep Section B questions fixed at 2 marks each.
+3. Keep Section C questions fixed at 5 marks each.
+4. Adjust the NUMBER of questions.
+5. The final total MUST equal the requested total exactly.
+
+NEVER change:
+- MCQ value from 1 mark.
+- Section B value from 2 marks.
+- Section C value from 5 marks.
+
+If an exact total cannot be represented using
+Sections A, B and C alone, add another suitable
+section rather than changing the fixed marks of A, B or C.
+
+==================================================
+QUESTION NUMBERING
+==================================================
+
+Number questions continuously across sections.
+
+Section A:
+1, 2, 3, 4
+
+Section B:
+5, 6, 7...
+
+Section C:
+8, 9...
+
+Use:
+
+1. Question text
+2. Question text
+
+Do NOT use:
+
+Q1.
+Q2.
+Question 1:
+1)
+2)
+
+The question number and question text MUST be on
+the same line.
+
+==================================================
+ANSWER KEY
+==================================================
+
+If answers are requested:
+
+- Put the Answer Key ONLY after all test questions.
+- Use the same question numbers.
+- Do not create new numbering for solution steps.
+
+For MCQs:
+
+SECTION A — ANSWERS
+
+1. B
+2. C
+3. A
+4. D
+
+For subjective questions:
+
+5. Answer:
+   explanation...
+
+Solution steps MUST NOT use:
 
 1.
 2.
 3.
-4.
 
 or:
 
 1)
 2)
 3)
-4)
 
-or any similar standalone numeric step numbering.
-
-Use bullet points, dashes, or plain paragraphs instead.
-
-For example, DO NOT write:
-
-Calculate ratios:
-
-1. AD/DB = 2/3
-2. AE/EC = 3.6/5.4 = 2/3
-
-Instead write:
-
-Calculate ratios:
-
-- AD/DB = 2/3
-- AE/EC = 3.6/5.4 = 2/3
-
-Question numbers such as Q1, Q2, Q3 are allowed.
-Only solution-step numbering is prohibited.
-
-This rule applies to:
-- answer keys
-- solutions
-- explanations
-- worked examples
-- calculations
-- derivations
-- use proper mathematical notation when mathematics is involved
-
-When generating a Mathematics test, inspect EVERY question independently.
-
-Use available Workspace class or student context when relevant.
+Use bullets, dashes, equations or plain paragraphs instead.
 
 ==================================================
-UNIVERSAL MATHEMATICS DIAGRAM SYSTEM
+FINAL TEST VALIDATION
 ==================================================
 
-A question requires a diagram ONLY when the mathematical problem
-genuinely depends on a visual representation.
-
-Examples include:
-
-- geometry
-- triangles
-- circles
-- tangents
-- angles
-- coordinate geometry
-- graphs
-- constructions
-- line segments
-- rectangles
-- squares
-- towers
-- vectors
-- number lines
-- geometric configurations
-- curves
-- mathematical illustrations
-
-If a question does NOT require a visual diagram:
-
-- do not create diagram data
-- do not mention a diagram
-- do not create ASCII
-- do not create a text sketch
-
-==================================================
-ABSOLUTE DIAGRAM PROHIBITION
-==================================================
-
-NEVER generate an ASCII or text-based diagram.
-
-NEVER use:
-
-- slash/backslash drawings
-- repeated spaces for positioning
-- Unicode geometry characters
-- Unicode box drawing
-- Markdown drawings
-- Mermaid
-- SVG strings
-- image URLs
-- base64 images
-- textual coordinate drawings
-
-NEVER copy an ASCII diagram from the user.
-
-NEVER put a visual diagram inside question.text.
-
-The question text must contain ONLY the student-facing question.
-
-==================================================
-DIAGRAM OWNERSHIP
-==================================================
-
-A diagram belongs ONLY to the exact question whose number is stored
-in the diagram object.
-
-For EVERY Mathematics question that genuinely requires a diagram,
-create a separate diagram object:
-
-{
-  "number": QUESTION_NUMBER,
-  "diagram": {
-    "type": "scene",
-    "points": [],
-    "lines": [],
-    "arrows": [],
-    "circles": [],
-    "ellipses": [],
-    "rectangles": [],
-    "polygons": [],
-    "paths": [],
-    "arcs": [],
-    "curves": [],
-    "labels": [],
-    "dimensions": []
-  }
-}
-
-The number MUST exactly match the actual generated question number.
-
-Examples:
-
-Q3 diagram -> "number": 3
-
-Q8 diagram -> "number": 8
-
-Q17 diagram -> "number": 17
-
-Q24 diagram -> "number": 24
-
-NEVER assume that a diagram belongs to Q8, Q9, or any other fixed
-question number.
-
-NEVER shift diagram numbers.
-
-NEVER reorder diagram numbers.
-
-NEVER infer diagram ownership from the answer key.
-
-==================================================
-UNIVERSAL VECTOR SCENE
-==================================================
-
-The ONLY supported diagram type is:
-
-"type": "scene"
-
-Do NOT create separate diagram types such as:
-
-- triangle
-- circle
-- square
-- rectangle
-- tower
-- tangent
-- angle
-- graph
-- coordinatePlane
-- functionGraph
-
-These are visual concepts, not diagram types.
-
-Represent them using vector primitives inside "scene".
-
-Supported vector primitives:
-
-- points
-- lines
-- arrows
-- circles
-- ellipses
-- rectangles
-- polygons
-- paths
-- arcs
-- curves
-- labels
-
-IMPORTANT MATHS DIAGRAM RULE:
-
-Do NOT use the "dimensions" primitive for Maths diagrams.
-
-The "dimensions" array must always remain empty:
-
-"dimensions": []
-
-Do NOT generate:
-- measurement numbers
-- measurement labels
-- "5"
-- "10"
-- "5 cm"
-- "10 cm"
-- length dimension arrows
-- height dimension arrows
-- width dimension arrows
-- dimension lines
-- automatic unit annotations
-
-If a numerical value is explicitly part of the mathematical problem,
-keep it in the question/content rather than converting it into a
-diagram dimension.
-
-Mathematical expressions that are explicitly required as part of
-the diagram may still be represented as labels, for example:
-
-- "AB = ?"
-- "x = 5"
-- "2x + 3"
-
-These are mathematical expressions, not automatic dimensions.
-
-A single scene may contain any combination of these primitives.
-==================================================
-FINAL MATHS DIAGRAM DIMENSION CHECK
-==================================================
-
-Before returning a Maths diagram, verify:
-
-"dimensions": []
-
-The dimensions array MUST be empty.
-
-If any dimension object was generated, remove it.
-
-Remove any automatically generated:
-- measurement number
-- measurement unit
-- length annotation
-- height annotation
-- width annotation
-- dimension line
-- dimension arrow
-- "cm"
-- "m"
-- "mm"
-- standalone measurement numbers
-
-Do NOT remove mathematical expressions that are explicitly part
-of the problem, such as:
-
-"AB = ?"
-"x = 5"
-"2x + 3"
-
-Those are mathematical labels, not automatic dimensions.
-
-The geometry itself must remain unchanged.
-==================================================
-
-==================================================
-VECTOR COORDINATES
-==================================================
-
-All renderer coordinates MUST be finite numeric values.
-
-Use actual numbers.
-
-Do NOT use symbolic coordinates such as:
-
-"x"
-"y"
-"r"
-"h"
-"a"
-"b"
-
-when the renderer requires a numeric value.
-
-Choose sensible coordinates that accurately represent the
-mathematical configuration.
-
-==================================================
-POINT
-==================================================
-
-Use:
-
-{
-  "x": 0,
-  "y": 0,
-  "label": "O"
-}
-
-The label is optional.
-
-==================================================
-LINE
-==================================================
-
-Use:
-
-{
-  "x1": 0,
-  "y1": 0,
-  "x2": 8,
-  "y2": 0
-}
-
-==================================================
-ARROW / VECTOR
-==================================================
-
-Use:
-
-{
-  "x1": 0,
-  "y1": 0,
-  "x2": 8,
-  "y2": 0
-}
-
-==================================================
-CIRCLE
-==================================================
-
-Use:
-
-{
-  "cx": 0,
-  "cy": 0,
-  "r": 5
-}
-
-For a circle question, include the actual points and lines
-needed to represent the mathematical configuration.
-
-==================================================
-ELLIPSE
-==================================================
-
-Use:
-
-{
-  "cx": 0,
-  "cy": 0,
-  "rx": 6,
-  "ry": 3
-}
-
-==================================================
-RECTANGLE
-==================================================
-
-Use:
-
-{
-  "x": 0,
-  "y": 0,
-  "width": 8,
-  "height": 5
-}
-
-==================================================
-POLYGON
-==================================================
-
-Use:
-
-{
-  "points": [
-    {
-      "x": 0,
-      "y": 0
-    },
-    {
-      "x": 8,
-      "y": 0
-    },
-    {
-      "x": 4,
-      "y": 5
-    }
-  ]
-}
-
-Triangles, quadrilaterals, pentagons and other polygons should
-be represented using polygon points or explicit lines.
-
-==================================================
-ARC
-==================================================
-
-Use:
-
-{
-  "cx": 0,
-  "cy": 0,
-  "r": 2,
-  "startAngle": 0,
-  "endAngle": 60
-}
-
-Use arcs to represent mathematical angles or curved portions
-when they are genuinely required.
-
-==================================================
-CURVE
-==================================================
-
-Use numeric points:
-
-{
-  "points": [
-    {
-      "x": -4,
-      "y": 4
-    },
-    {
-      "x": -2,
-      "y": 1
-    },
-    {
-      "x": 0,
-      "y": 0
-    },
-    {
-      "x": 2,
-      "y": 1
-    },
-    {
-      "x": 4,
-      "y": 4
-    }
-  ]
-}
-
-Use curves for mathematical graphs and other genuinely curved
-visuals.
-
-==================================================
-ANGLE GENERATION: COMPLETELY DISABLED
-==================================================
-
-DO NOT GENERATE ANGLE MARKINGS IN THE DIAGRAM JSON.
-
-This is a strict rule.
-
-If the question contains an angle, the angle may appear in
-the QUESTION TEXT, but it must NOT be represented visually
-inside the diagram.
-
-For example:
-
-Question:
-"Given ∠BAT = 60°, find the value of x."
-
-The diagram may contain:
-
-A
-B
-T
-AB
-AT
-other required geometry
-
-But the diagram MUST NOT contain:
-
-60°
-∠BAT
-angle arc
-angle wedge
-angle sector
-angle marker
-right-angle box
-curved angle indicator
-any visual indication of the angle
-
-==================================================
-FORBIDDEN ANGLE OUTPUT
-==================================================
-
-NEVER generate any of the following:
-
-1. "angles" array
-
-Example FORBIDDEN:
-
-"angles": [
-    {
-        "vertex": "A",
-        "side1": "AB",
-        "side2": "AT",
-        "value": "60°"
-    }
-]
-
-2. An object with:
-
-"type": "angle"
-
-3. An angle arc.
-
-Example FORBIDDEN:
-
-"arcs": [
-    {
-        ...
-    }
-]
-
-when the arc represents an angle.
-
-4. A standalone angle-value label.
-
-Example FORBIDDEN:
-
-"labels": [
-    {
-        "text": "60°"
-    }
-]
-
-5. A right-angle marker.
-
-6. An angle wedge or sector whose purpose is to mark
-   an angle.
-
-7. Any text such as:
-
-"30°"
-"45°"
-"60°"
-"80°"
-"90°"
-"∠A"
-"∠ABC"
-"∠APB"
-
-inside the diagram.
-
-==================================================
-IMPORTANT: DO NOT HIDE ANGLES IN OTHER PRIMITIVES
-==================================================
-
-Do NOT bypass this rule by representing an angle using:
-
-- "arc"
-- "path"
-- "curve"
-- "polygon"
-- "sector"
-- "label"
-- "dimension"
-- "custom"
-- "type": "angle"
-- "angles"
-
-If a primitive is being used specifically to visually mark
-an angle, DO NOT generate that primitive.
-
-==================================================
-ANGLE INFORMATION STAYS IN QUESTION TEXT
-==================================================
-
-If the mathematical question says:
-
-∠APB = 80°
-
-keep:
-
-"∠APB = 80°"
-
-in the question text.
-
-Do NOT copy "80°" into the diagram.
-
-If the question says:
-
-AB ⟂ BC
-
-keep that information in the question text.
-
-Do NOT generate a right-angle square or angle marker in the diagram.
-
-==================================================
-DIAGRAM PURPOSE
-==================================================
-
-The diagram should show ONLY the underlying geometry required
-to understand the problem.
-
-For an angle question, show the relevant:
-
-- points
-- vertices
-- lines
-- circles
-- triangles
-- other required geometry
-
-but NOT the angle marking itself.
-
-==================================================
-FINAL ANGLE CHECK
-==================================================
-
-Before returning the diagram JSON, perform this check:
-
-Does the diagram contain an "angles" property?
-
-→ If YES, remove it.
-
-Does the diagram contain an object with:
-
-"type": "angle"
-
-→ If YES, remove it.
-
-Does the diagram contain an arc whose purpose is to mark an angle?
-
-→ If YES, remove it.
-
-Does the diagram contain a standalone angle value such as
-30°, 45°, 60°, 80° or 90°?
-
-→ If YES, remove it.
-
-Does the diagram contain a right-angle marker?
-
-→ If YES, remove it.
-
-Does any label contain an angle expression such as ∠ABC?
-
-→ If YES, remove it.
-
-Only after all of these checks pass should the diagram JSON
-be returned.
-==================================================
-
-==================================================
-LABEL
-==================================================
-
-Use:
-
-{
-  "x": 0,
-  "y": 0,
-  "text": "O"
-}
-
-==================================================
-DIMENSION
-==================================================
-
-Use:
-
-{
-  "x1": 0,
-  "y1": 0,
-  "x2": 8,
-  "y2": 0,
-  "text": "8 cm"
-}
-
-==================================================
-COMMON DIAGRAMS
-==================================================
-
-Triangle:
-
-Use polygon points or three lines plus labels.
-
-Circle:
-
-Use circle + required points + required lines + labels.
-
-Tangent:
-
-Use circle + tangent lines + tangent points + external point +
-labels.
-
-Angle:
-
-Use two arms + arc + vertex + labels.
-
-Rectangle:
-
-Use rectangle or four lines.
-
-Square:
-
-Use polygon or four lines with equal geometric dimensions.
-
-Tower:
-
-Use structured lines/polygons for:
-
-- tower
-- base
-- top
-- ground
-- observation point
-- relevant angles
-- labels
-
-NEVER draw a tower using text characters.
-
-Coordinate graph:
-
-Use vector axes, lines, points, labels and curves.
-
-Function graph:
-
-Use vector curves/paths and axes when required.
-
-Construction:
-
-Use lines, circles, arcs, points and labels.
-
-Vector:
-
-Use arrows with numeric start/end coordinates.
-
-Number line:
-
-Use a line, tick marks, points and labels.
-
-Any other mathematical diagram:
-
-Represent it using the available vector primitives.
-
-==================================================
-QUESTION AND DIAGRAM MUST BE SEPARATE
-==================================================
-
-Example question:
-
-Q8. TP and TQ are tangents drawn from an external point T to
-a circle with centre O. If angle PTQ is 60 degrees, find the
-required angles.
-
-The question text must NOT contain a drawing.
-
-The separate diagram object is:
-
-{
-  "number": 8,
-  "diagram": {
-    "type": "scene",
-    "points": [
-      {
-        "x": 0,
-        "y": 0,
-        "label": "O"
-      },
-      {
-        "x": -4,
-        "y": 0,
-        "label": "P"
-      },
-      {
-        "x": 4,
-        "y": 0,
-        "label": "Q"
-      },
-      {
-        "x": 0,
-        "y": 7,
-        "label": "T"
-      }
-    ],
-    "lines": [
-      {
-        "x1": -4,
-        "y1": 0,
-        "x2": 4,
-        "y2": 0
-      },
-      {
-        "x1": -4,
-        "y1": 0,
-        "x2": 0,
-        "y2": 7
-      },
-      {
-        "x1": 4,
-        "y1": 0,
-        "x2": 0,
-        "y2": 7
-      }
-    ],
-    "arrows": [],
-    "circles": [
-      {
-        "cx": 0,
-        "cy": 0,
-        "r": 4
-      }
-    ],
-    "ellipses": [],
-    "rectangles": [],
-    "polygons": [],
-    "paths": [],
-    "arcs": [],
-    "curves": [],
-    "labels": [
-      {
-        "x": 0,
-        "y": 0,
-        "text": "O"
-      },
-      {
-        "x": -4,
-        "y": 0,
-        "text": "P"
-      },
-      {
-        "x": 4,
-        "y": 0,
-        "text": "Q"
-      },
-      {
-        "x": 0,
-        "y": 7,
-        "text": "T"
-      }
-    ],
-    "dimensions": []
-  }
-}
-
-The example number is illustrative only.
-
-ALWAYS use the actual generated question number.
-
-==================================================
-MULTIPLE COMPONENTS
-==================================================
-
-If a question requires a complex diagram, ALL visual components
-must belong to that question's single scene.
-
-For example, a tangent problem can contain:
-
-- circle
-- tangent lines
-- points
-- labels
-- angle arcs
-- dimensions
-
-inside the SAME scene.
-
-Do NOT distribute those components across other questions.
-
-==================================================
-ANSWER KEY
-==================================================
-
-The answer key and detailed solutions must contain NO ASCII
-or text-based drawings.
-
-NEVER obtain a question diagram from the answer key.
-
-NEVER attach an answer-key diagram to a question.
-
-NEVER match diagrams by position.
-
-NEVER match diagrams sequentially.
-
-NEVER use an unnumbered diagram as a fallback.
-
-The exact question number is the ONLY diagram ownership identifier.
-
-==================================================
-FINAL SELF-CHECK
-==================================================
-
-Before returning a Mathematics test:
-
-1. Inspect EVERY question independently.
-2. Decide whether it genuinely needs a diagram.
-3. Keep question text free of drawings.
-4. Remove every ASCII/text diagram.
-5. Create separate diagram metadata only when required.
-6. Use the exact actual question number.
-7. Use "type": "scene".
-8. Use only supported vector primitives.
-9. Use finite numeric coordinates.
-10. Keep every diagram inside its owning question.
-11. Never attach answer-key diagrams to questions.
-12. Never use sequential diagram assignment.
-13. Never use fallback diagram assignment.
-14. Never use image URLs.
-15. Never use base64 images.
-16. Never use SVG strings.
-17. Never use Mermaid.
-18. Never use ASCII.
-19. Ensure diagram metadata is valid JSON.
-20. Ensure the diagram actually represents the mathematical
-configuration described by the question.
-
-The AI provides vector diagram structure only.
-The Nyxora PDF renderer creates the actual visual diagram.
-
-NEVER generate a textual drawing as a fallback.
+Before returning the test, verify:
+
+- The user's TOTAL MARKS was identified correctly.
+- Section A exists.
+- Section A contains exactly 4 MCQs.
+- Every MCQ is exactly 1 mark.
+- Every MCQ has exactly 4 options.
+- Section B questions are exactly 2 marks each.
+- Section C questions are exactly 5 marks each.
+- Sections appear in A → B → C order when applicable.
+- Question numbering is continuous.
+- Total marks equal the user's requested total exactly.
+- No solution steps are numbered.
+- No question is empty.
+- No answers are included unless requested.
 `,
-  
 
 
-homework: `
+
+  homework: `
 You are Nyxora AI operating as a Homework Creator.
 
 Create clear, age-appropriate and useful homework for students.
@@ -1442,10 +810,10 @@ function buildWorkspaceContextPrompt(
     )
 
       ? workspaceContext.documents
-          .slice(
-            0,
-            MAX_WORKSPACE_DOCUMENTS
-          )
+        .slice(
+          0,
+          MAX_WORKSPACE_DOCUMENTS
+        )
 
       : [];
 
@@ -1456,10 +824,10 @@ function buildWorkspaceContextPrompt(
     )
 
       ? workspaceContext.results
-          .slice(
-            0,
-            MAX_WORKSPACE_RESULTS
-          )
+        .slice(
+          0,
+          MAX_WORKSPACE_RESULTS
+        )
 
       : [];
 
@@ -1595,18 +963,18 @@ function buildWorkspaceContextPrompt(
           Number.isFinite(
             marksObtained
           ) &&
-          Number.isFinite(
-            totalMarks
-          ) &&
-          totalMarks > 0
+            Number.isFinite(
+              totalMarks
+            ) &&
+            totalMarks > 0
 
             ? Math.round(
-                (
-                  marksObtained /
-                  totalMarks
-                ) *
-                100
-              )
+              (
+                marksObtained /
+                totalMarks
+              ) *
+              100
+            )
 
             : null;
 
@@ -1655,70 +1023,70 @@ export default function useChat({
   ] = useState(false);
 
   const [
-  thinkingText,
-  setThinkingText,
-] = useState("");
+    thinkingText,
+    setThinkingText,
+  ] = useState("");
 
-const attachmentCacheRef =
-  useRef(
-    new Map()
-  );
+  const attachmentCacheRef =
+    useRef(
+      new Map()
+    );
 
-const thinkingTimerRef =
-  useRef(null);
+  const thinkingTimerRef =
+    useRef(null);
 
   const startThinking = (
-  userMessage,
-  file = null
-) => {
-  const messages =
-    getThinkingMessages(
-      userMessage,
-      file
-    );
-
-  if (
-    thinkingTimerRef.current
-  ) {
-    window.clearInterval(
-      thinkingTimerRef.current
-    );
-  }
-
-  let index = 0;
-
-  setThinkingText(
-    messages[0]
-  );
-
-  setIsThinking(true);
-
-  thinkingTimerRef.current =
-    window.setInterval(() => {
-      index =
-        (index + 1) %
-        messages.length;
-
-      setThinkingText(
-        messages[index]
+    userMessage,
+    file = null
+  ) => {
+    const messages =
+      getThinkingMessages(
+        userMessage,
+        file
       );
-    }, 1400);
-};
 
-const stopThinking = () => {
-  if (
-    thinkingTimerRef.current
-  ) {
-    window.clearInterval(
+    if (
       thinkingTimerRef.current
+    ) {
+      window.clearInterval(
+        thinkingTimerRef.current
+      );
+    }
+
+    let index = 0;
+
+    setThinkingText(
+      messages[0]
     );
+
+    setIsThinking(true);
 
     thinkingTimerRef.current =
-      null;
-  }
+      window.setInterval(() => {
+        index =
+          (index + 1) %
+          messages.length;
 
-  setThinkingText("");
-};
+        setThinkingText(
+          messages[index]
+        );
+      }, 1400);
+  };
+
+  const stopThinking = () => {
+    if (
+      thinkingTimerRef.current
+    ) {
+      window.clearInterval(
+        thinkingTimerRef.current
+      );
+
+      thinkingTimerRef.current =
+        null;
+    }
+
+    setThinkingText("");
+  };
 
   const [
     attachmentError,
@@ -1746,6 +1114,36 @@ const stopThinking = () => {
     selectedMode ===
     PDF_GENERATOR_MODE;
 
+    // ====================================================
+// TEST REQUEST DETECTION
+// ====================================================
+
+const isTestRequest =
+  (text = "") => {
+
+    const value =
+      String(text || "")
+        .trim()
+        .toLowerCase();
+
+    if (!value) {
+      return false;
+    }
+
+    const hasTestIntent =
+      /\b(create|make|generate|prepare|design|set|write|draft|give|build)\b/i
+        .test(value);
+
+    const hasTestContent =
+      /\b(test|question paper|question-paper|exam|examination|assessment|mcq test|practice test|unit test|chapter test)\b/i
+        .test(value);
+
+    return (
+      hasTestIntent &&
+      hasTestContent
+    );
+  };
+
 
   // ====================================================
   // FILE EXTRACTION
@@ -1765,7 +1163,7 @@ const stopThinking = () => {
 
       if (
         file.type ===
-          "application/pdf" ||
+        "application/pdf" ||
         file.name
           ?.toLowerCase()
           .endsWith(".pdf")
@@ -1793,7 +1191,7 @@ const stopThinking = () => {
 
       if (
         file.type ===
-          "text/plain" ||
+        "text/plain" ||
         file.name
           ?.toLowerCase()
           .endsWith(".txt") ||
@@ -1921,101 +1319,100 @@ ${extractedText}`;
 
     };
 
-    // ======================================================
-// MULTIPLE ATTACHMENT PROMPT
-// ======================================================
+  // ======================================================
+  // MULTIPLE ATTACHMENT PROMPT
+  // ======================================================
 
-const buildPromptWithFiles =
-  async (
-    text,
-    selectedFiles = []
-  ) => {
+  const buildPromptWithFiles =
+    async (
+      text,
+      selectedFiles = []
+    ) => {
 
-    let userPrompt =
-      cleanValue(
-        text
-      );
-
-
-    const documentFiles =
-      selectedFiles.filter(
-        (
-          selectedFile
-        ) =>
-          selectedFile &&
-          !selectedFile.type
-            ?.startsWith(
-              "image/"
-            )
-      );
-
-
-    for (
-      let index = 0;
-      index <
-        documentFiles.length;
-      index++
-    ) {
-
-      const selectedFile =
-        documentFiles[index];
-
-
-      const extractedText =
-        await extractFileContent(
-          selectedFile
+      let userPrompt =
+        cleanValue(
+          text
         );
 
 
-      if (
-        extractedText
+      const documentFiles =
+        selectedFiles.filter(
+          (
+            selectedFile
+          ) =>
+            selectedFile &&
+            !selectedFile.type
+              ?.startsWith(
+                "image/"
+              )
+        );
+
+
+      for (
+        let index = 0;
+        index <
+        documentFiles.length;
+        index++
       ) {
 
-        userPrompt += `
+        const selectedFile =
+          documentFiles[index];
+
+
+        const extractedText =
+          await extractFileContent(
+            selectedFile
+          );
+
+
+        if (
+          extractedText
+        ) {
+
+          userPrompt += `
 
 ATTACHED FILE ${index + 1} TEXT CONTENT:
-FILE NAME: ${
-          selectedFile.name ||
-          "Attachment"
-        }
+FILE NAME: ${selectedFile.name ||
+            "Attachment"
+            }
 
 ${extractedText}`;
 
+        }
+
       }
 
-    }
 
+      return userPrompt;
 
-    return userPrompt;
-
-  };
+    };
 
 
   // ====================================================
   // FINAL MODE PROMPT
   // ====================================================
 
-const buildModePrompt =
-(
-  userPrompt,
-  pdfRequested = false
-) => {
+  const buildModePrompt =
+    (
+      userPrompt,
+      pdfRequested = false
+    ) => {
 
-  const modeInstruction =
-    assistantModePrompts[
-      selectedMode
-    ] ||
-    assistantModePrompts.normal;
+      const modeInstruction =
+        assistantModePrompts[
+        selectedMode
+        ] ||
+        assistantModePrompts.normal;
 
-  const workspacePrompt =
-    buildWorkspaceContextPrompt(
-      workspaceContext
-    );
+      const workspacePrompt =
+        buildWorkspaceContextPrompt(
+          workspaceContext
+        );
 
-  const pdfInstruction =
-    pdfRequested
-      ? buildPdfInstruction()
-      : "";
+      const pdfInstruction =
+        pdfRequested
+          ? buildPdfInstruction()
+          : "";
 
       const diagramOutputEnforcement = `
 ==================================================
@@ -2649,7 +2046,53 @@ END UNIVERSAL DIAGRAM OUTPUT CONTRACT
 ==================================================
 `;
 
-  return `
+const testFinalOverride =
+  selectedMode === "test"
+    ? `
+==================================================
+FINAL TEST STRUCTURE OVERRIDE
+==================================================
+
+This is the final authority for test structure and marking.
+
+The user's requested TOTAL MARKS may be ANY value.
+
+SECTION A:
+- Exactly 4 MCQs.
+- Each MCQ = exactly 1 mark.
+- Section A = exactly 4 marks.
+- Exactly 4 options per MCQ.
+
+SECTION B:
+- Every question = exactly 2 marks.
+
+SECTION C:
+- Every question = exactly 5 marks.
+
+Calculate the number of questions required so the
+FINAL TOTAL exactly equals the user's requested total.
+
+Never give an MCQ 5 marks.
+
+Never change the fixed mark values of Sections A,
+B or C to satisfy a conflicting instruction.
+
+If the user request conflicts with these fixed
+section-mark rules, keep the fixed section-mark rules.
+
+Keep question numbering continuous across sections.
+
+Before returning the test, verify:
+
+Section A marks
++ Section B marks
++ Section C marks
++ any additional required section
+= EXACT requested TOTAL MARKS.
+`
+    : "";
+
+return `
 ${modeInstruction}
 
 ${workspacePrompt}
@@ -2661,20 +2104,171 @@ ${diagramOutputEnforcement}
 USER REQUEST:
 
 ${userPrompt}
-`.trim();
-};
 
-  // ====================================================
-  // PDF MODE WARNING
-  // ====================================================
+${testFinalOverride}
+`.trim();}
 
-const addPdfModeWarning =
+// ====================================================
+// TEST GENERATOR MODE WARNING
+// ====================================================
+
+const addTestGeneratorWarning =
   async ({
     currentChat,
     cleanUserMessage,
     file,
     files = [],
   }) => {
+
+    const history =
+      currentChat.messages ||
+      [];
+
+    const fileMetadata =
+      buildFileMetadata(
+        file
+      );
+
+    const userMessage = {
+      id:
+        Date.now(),
+
+      role:
+        "user",
+
+      message:
+        cleanUserMessage,
+
+      ...(fileMetadata
+        ? {
+            file:
+              fileMetadata,
+          }
+        : {}),
+    };
+
+    if (
+      files.length > 0 &&
+      userMessage.id
+    ) {
+      attachmentCacheRef.current.set(
+        userMessage.id,
+        files
+      );
+    }
+
+    const warningMessage = {
+      id:
+        Date.now() + 1,
+
+      role:
+        "assistant",
+
+      message:
+        TEST_GENERATOR_WARNING,
+
+      testModeWarning:
+        true,
+
+      testGeneratorMode:
+        false,
+    };
+
+    const hasUserMessage =
+      history.some(
+        (msg) =>
+          msg.role ===
+          "user"
+      );
+
+    const shouldCreateTitle =
+      currentChat.title ===
+        "New Chat" &&
+      !hasUserMessage;
+
+    const generatedTitle =
+      shouldCreateTitle
+        ? buildChatTitle(
+            cleanUserMessage,
+            file
+          )
+        : currentChat.title;
+
+    const newMessages = [
+      ...history,
+      userMessage,
+      warningMessage,
+    ];
+
+    setChats(
+      (prev) =>
+        prev.map(
+          (chat) => {
+
+            if (
+              chat.id !==
+              activeChatId
+            ) {
+              return chat;
+            }
+
+            return {
+              ...chat,
+
+              title:
+                shouldCreateTitle
+                  ? generatedTitle
+                  : chat.title,
+
+              messages:
+                newMessages,
+            };
+
+          }
+        )
+    );
+
+    await saveMessages(
+      activeChatId,
+      newMessages
+    );
+
+    if (
+      shouldCreateTitle &&
+      generatedTitle !==
+        "New Chat"
+    ) {
+      try {
+
+        await updateChatTitle(
+          activeChatId,
+          generatedTitle
+        );
+
+      } catch (error) {
+
+        console.error(
+          "Failed to save chat title:",
+          error
+        );
+
+      }
+    }
+
+    return true;
+  };
+
+  // ====================================================
+  // PDF MODE WARNING
+  // ====================================================
+
+  const addPdfModeWarning =
+    async ({
+      currentChat,
+      cleanUserMessage,
+      file,
+      files = [],
+    }) => {
 
       const history =
         currentChat.messages ||
@@ -2701,25 +2295,25 @@ const addPdfModeWarning =
         ...(fileMetadata
 
           ? {
-              file:
-                fileMetadata,
-            }
+            file:
+              fileMetadata,
+          }
 
           : {}),
 
       };
 
-if (
-  files.length > 0 &&
-  userMessage.id
-) {
+      if (
+        files.length > 0 &&
+        userMessage.id
+      ) {
 
-  attachmentCacheRef.current.set(
-    userMessage.id,
-    files
-  );
+        attachmentCacheRef.current.set(
+          userMessage.id,
+          files
+        );
 
-}
+      }
 
 
       const warningMessage = {
@@ -2752,7 +2346,7 @@ if (
 
       const shouldCreateTitle =
         currentChat.title ===
-          "New Chat" &&
+        "New Chat" &&
         !hasUserMessage;
 
 
@@ -2760,9 +2354,9 @@ if (
         shouldCreateTitle
 
           ? buildChatTitle(
-              cleanUserMessage,
-              file
-            )
+            cleanUserMessage,
+            file
+          )
 
           : currentChat.title;
 
@@ -2821,7 +2415,7 @@ if (
       if (
         shouldCreateTitle &&
         generatedTitle !==
-          "New Chat"
+        "New Chat"
       ) {
 
         try {
@@ -2880,41 +2474,41 @@ if (
           ? payload
 
           : payload?.message ||
-            "";
+          "";
 
 
-const files =
-  typeof payload ===
-    "string"
+      const files =
+        typeof payload ===
+          "string"
 
-    ? []
+          ? []
 
-    : Array.isArray(
-        payload?.files
-      )
+          : Array.isArray(
+            payload?.files
+          )
 
-      ? payload.files.filter(
-          Boolean
-        )
+            ? payload.files.filter(
+              Boolean
+            )
 
-      : payload?.file
-        ? [
-            payload.file
-          ]
+            : payload?.file
+              ? [
+                payload.file
+              ]
 
-        : [];
+              : [];
 
 
-const file =
-  files[0] ||
-  null;
+      const file =
+        files[0] ||
+        null;
 
-if (
-  !cleanValue(text) &&
-  files.length === 0
-) {
-  return false;
-}
+      if (
+        !cleanValue(text) &&
+        files.length === 0
+      ) {
+        return false;
+      }
 
 
       const currentChat =
@@ -2944,31 +2538,31 @@ if (
           text
         );
 
-        
+
       // ================================================
       // DEDICATED PDF GENERATOR MODE VALIDATION
       // ================================================
 
-if (
-  isPdfGeneratorMode &&
-  !(
-    /\bgenerate\b/iu.test(
-      cleanUserMessage
-    ) &&
-    /\bpdf\b/iu.test(
-      cleanUserMessage
-    )
-  )
-) {
+      if (
+        isPdfGeneratorMode &&
+        !(
+          /\bgenerate\b/iu.test(
+            cleanUserMessage
+          ) &&
+          /\bpdf\b/iu.test(
+            cleanUserMessage
+          )
+        )
+      ) {
 
         try {
 
-return await addPdfModeWarning({
-  currentChat,
-  cleanUserMessage,
-  file,
-  files,
-});
+          return await addPdfModeWarning({
+            currentChat,
+            cleanUserMessage,
+            file,
+            files,
+          });
 
         } catch (error) {
 
@@ -2985,9 +2579,43 @@ return await addPdfModeWarning({
       }
 
       startThinking(
-  cleanUserMessage,
-  file
-);
+        cleanUserMessage,
+        file
+      );
+
+// ================================================
+// TEST GENERATOR MODE VALIDATION
+// ================================================
+
+if (
+  selectedMode !==
+    TEST_GENERATOR_MODE &&
+  isTestRequest(
+    cleanUserMessage
+  )
+) {
+
+  try {
+
+    return await addTestGeneratorWarning({
+      currentChat,
+      cleanUserMessage,
+      file,
+      files,
+    });
+
+  } catch (error) {
+
+    console.error(
+      "Test Generator mode warning error:",
+      error
+    );
+
+    return false;
+
+  }
+
+}
 
       // ================================================
       // PDF REQUEST DETECTION
@@ -3005,38 +2633,38 @@ return await addPdfModeWarning({
           ? true
 
           : isPdfRequest(
-              cleanUserMessage
-            );
-          
-            const notesImageRequested =
-  pdfRequested &&
-  isNotesImageRequest(
-    cleanUserMessage
-  );
+            cleanUserMessage
+          );
 
-  console.log(
-  "🖼️ Notes image request check:",
-  {
-    cleanUserMessage,
-    pdfRequested,
-    notesImageRequested,
-    notesImageTopic:
-      notesImageRequested
-        ? cleanUserMessage
-        : "",
-  }
-);
+      const notesImageRequested =
+        pdfRequested &&
+        isNotesImageRequest(
+          cleanUserMessage
+        );
+
+      console.log(
+        "🖼️ Notes image request check:",
+        {
+          cleanUserMessage,
+          pdfRequested,
+          notesImageRequested,
+          notesImageTopic:
+            notesImageRequested
+              ? cleanUserMessage
+              : "",
+        }
+      );
 
       let userPrompt;
 
 
       try {
 
- userPrompt =
-  await buildPromptWithFiles(
-    cleanUserMessage,
-    files
-  );
+        userPrompt =
+          await buildPromptWithFiles(
+            cleanUserMessage,
+            files
+          );
       } catch (error) {
 
         return handleAttachmentError(
@@ -3074,7 +2702,7 @@ return await addPdfModeWarning({
 
       const shouldCreateTitle =
         currentChat.title ===
-          "New Chat" &&
+        "New Chat" &&
         !hasUserMessage;
 
 
@@ -3082,9 +2710,9 @@ return await addPdfModeWarning({
         shouldCreateTitle
 
           ? buildChatTitle(
-              text,
-              file
-            )
+            text,
+            file
+          )
 
           : currentChat.title;
 
@@ -3096,84 +2724,84 @@ return await addPdfModeWarning({
         );
 
 
-const fileMetadataList =
-  files.map(
-    (
-      selectedFile
-    ) =>
-      buildFileMetadata(
-        selectedFile
-      )
-  );
+      const fileMetadataList =
+        files.map(
+          (
+            selectedFile
+          ) =>
+            buildFileMetadata(
+              selectedFile
+            )
+        );
 
 
-const fileMetadata =
-  fileMetadataList[0] ||
-  null;
+      const fileMetadata =
+        fileMetadataList[0] ||
+        null;
 
 
       const userMessage = {
 
-  id:
-    Date.now(),
+        id:
+          Date.now(),
 
-  role:
-    "user",
+        role:
+          "user",
 
-  message:
-    cleanUserMessage,
+        message:
+          cleanUserMessage,
 
-  pdfRequested:
-    pdfRequested,
+        pdfRequested:
+          pdfRequested,
 
-  notesImageRequested:
-    notesImageRequested,
+        notesImageRequested:
+          notesImageRequested,
 
-  notesImageTopic:
-    notesImageRequested
-      ? cleanUserMessage
-      : "",
+        notesImageTopic:
+          notesImageRequested
+            ? cleanUserMessage
+            : "",
 
-  ...(fileMetadata
-    ? {
-        file:
-          fileMetadata,
-      }
-    : {}),
+        ...(fileMetadata
+          ? {
+            file:
+              fileMetadata,
+          }
+          : {}),
 
-    ...(fileMetadataList.length > 0
-  ? {
-      files:
-        fileMetadataList,
-    }
-  : {}),
-};
+        ...(fileMetadataList.length > 0
+          ? {
+            files:
+              fileMetadataList,
+          }
+          : {}),
+      };
 
-const aiMessage = {
+      const aiMessage = {
 
-  id:
-    Date.now() + 1,
+        id:
+          Date.now() + 1,
 
-  role:
-    "assistant",
+        role:
+          "assistant",
 
-  message:
-    "",
+        message:
+          "",
 
-  pdfRequested:
-    pdfRequested,
+        pdfRequested:
+          pdfRequested,
 
-  pdfGeneratorMode:
-    isPdfGeneratorMode,
+        pdfGeneratorMode:
+          isPdfGeneratorMode,
 
-notesImageRequested:
-  notesImageRequested,
+        notesImageRequested:
+          notesImageRequested,
 
-notesImageTopic:
-  notesImageRequested
-    ? cleanUserMessage
-    : "",
-};
+        notesImageTopic:
+          notesImageRequested
+            ? cleanUserMessage
+            : "",
+      };
 
 
       const newMessages = [
@@ -3230,7 +2858,7 @@ notesImageTopic:
       if (
         shouldCreateTitle &&
         generatedTitle !==
-          "New Chat"
+        "New Chat"
       ) {
 
         try {
@@ -3262,11 +2890,11 @@ notesImageTopic:
           memoryMessage:
             cleanUserMessage,
 
-file,
+          file,
 
-files,
+          files,
 
-history,
+          history,
           messages:
             newMessages,
 
@@ -3295,7 +2923,7 @@ history,
           error
         );
 
-stopThinking();
+        stopThinking();
 
         setIsThinking(
           false
@@ -3373,7 +3001,7 @@ stopThinking();
 
       const lastUser =
         messages[
-          lastUserIndex
+        lastUserIndex
         ];
 
 
@@ -3384,9 +3012,9 @@ stopThinking();
             index
           ) =>
             index >
-              lastUserIndex &&
+            lastUserIndex &&
             msg.role ===
-              "assistant"
+            "assistant"
         );
 
 
@@ -3402,7 +3030,7 @@ stopThinking();
 
       const lastAssistant =
         messages[
-          assistantIndex
+        assistantIndex
         ];
 
 
@@ -3411,9 +3039,9 @@ stopThinking();
           lastUser.message
         );
 
-        startThinking(
-  cleanUserMessage
-);
+      startThinking(
+        cleanUserMessage
+      );
 
       // ================================================
       // PDF MODE REGENERATE PROTECTION
@@ -3431,23 +3059,23 @@ stopThinking();
             (msg) =>
 
               msg.id ===
-              lastAssistant.id
+                lastAssistant.id
 
                 ? {
-                    ...msg,
+                  ...msg,
 
-                    message:
-                      PDF_GENERATOR_WARNING,
+                  message:
+                    PDF_GENERATOR_WARNING,
 
-                    pdfRequested:
-                      false,
+                  pdfRequested:
+                    false,
 
-                    pdfModeWarning:
-                      true,
+                  pdfModeWarning:
+                    true,
 
-                    pdfGeneratorMode:
-                      false,
-                  }
+                  pdfGeneratorMode:
+                    false,
+                }
 
                 : msg
           );
@@ -3459,14 +3087,14 @@ stopThinking();
               (chat) =>
 
                 chat.id ===
-                activeChatId
+                  activeChatId
 
                   ? {
-                      ...chat,
+                    ...chat,
 
-                      messages:
-                        updatedMessages,
-                    }
+                    messages:
+                      updatedMessages,
+                  }
 
                   : chat
             )
@@ -3509,12 +3137,12 @@ stopThinking();
           ? true
 
           : Boolean(
-              lastAssistant
-                ?.pdfRequested
-            ) ||
-            isPdfRequest(
-              cleanUserMessage
-            );
+            lastAssistant
+              ?.pdfRequested
+          ) ||
+          isPdfRequest(
+            cleanUserMessage
+          );
 
 
       const prompt =
@@ -3529,23 +3157,23 @@ stopThinking();
           (msg) =>
 
             msg.id ===
-            lastAssistant.id
+              lastAssistant.id
 
               ? {
-                  ...msg,
+                ...msg,
 
-                  message:
-                    "",
+                message:
+                  "",
 
-                  pdfRequested:
-                    pdfRequested,
+                pdfRequested:
+                  pdfRequested,
 
-                  pdfModeWarning:
-                    false,
+                pdfModeWarning:
+                  false,
 
-                  pdfGeneratorMode:
-                    isPdfGeneratorMode,
-                }
+                pdfGeneratorMode:
+                  isPdfGeneratorMode,
+              }
 
               : msg
         );
@@ -3557,14 +3185,14 @@ stopThinking();
             (chat) =>
 
               chat.id ===
-              activeChatId
+                activeChatId
 
                 ? {
-                    ...chat,
+                  ...chat,
 
-                    messages:
-                      updatedMessages,
-                  }
+                  messages:
+                    updatedMessages,
+                }
 
                 : chat
           )
@@ -3696,7 +3324,7 @@ stopThinking();
 
       const originalMessage =
         activeChat.messages[
-          messageIndex
+        messageIndex
         ];
 
 
@@ -3718,9 +3346,9 @@ stopThinking();
               index
             ) =>
               index >
-                messageIndex &&
+              messageIndex &&
               msg.role ===
-                "assistant"
+              "assistant"
           );
 
 
@@ -3746,20 +3374,20 @@ stopThinking();
         );
 
 
-let finalFileMetadata =
-  originalMessage.file ||
-  null;
+      let finalFileMetadata =
+        originalMessage.file ||
+        null;
 
-let filesForAI =
-  attachmentCacheRef.current.get(
-    lastUser.id
-  ) ||
-  [];
+      let filesForAI =
+        attachmentCacheRef.current.get(
+          lastUser.id
+        ) ||
+        [];
 
 
-let fileForAI =
-  filesForAI[0] ||
-  null;
+      let fileForAI =
+        filesForAI[0] ||
+        null;
 
 
       if (
@@ -3772,30 +3400,30 @@ let fileForAI =
           );
 
 
-filesForAI = [
-  newFile
-];
+        filesForAI = [
+          newFile
+        ];
 
-fileForAI =
-  newFile;
+        fileForAI =
+          newFile;
 
-            }    else if (
-  removeFile
-) {
+      } else if (
+        removeFile
+      ) {
 
-  finalFileMetadata =
-    null;
+        finalFileMetadata =
+          null;
 
-  attachmentCacheRef.current.delete(
-    originalMessage.id
-  );
+        attachmentCacheRef.current.delete(
+          originalMessage.id
+        );
 
-}
+      }
 
-attachmentCacheRef.current.set(
-  originalMessage.id,
-  filesForAI
-);
+      attachmentCacheRef.current.set(
+        originalMessage.id,
+        filesForAI
+      );
 
 
       if (
@@ -3812,24 +3440,24 @@ attachmentCacheRef.current.set(
       // PDF MODE EDIT VALIDATION
       // ================================================
 
-const hasGenerateWord =
-  /\bgenerate\b/iu.test(
-    cleanUserMessage
-  );
+      const hasGenerateWord =
+        /\bgenerate\b/iu.test(
+          cleanUserMessage
+        );
 
 
-const hasPdfWord =
-  /\bpdf\b/iu.test(
-    cleanUserMessage
-  );
+      const hasPdfWord =
+        /\bpdf\b/iu.test(
+          cleanUserMessage
+        );
 
 
-const validPdfGeneratorCommand =
-  !isPdfGeneratorMode ||
-  (
-    hasGenerateWord &&
-    hasPdfWord
-  );
+      const validPdfGeneratorCommand =
+        !isPdfGeneratorMode ||
+        (
+          hasGenerateWord &&
+          hasPdfWord
+        );
 
 
       const pdfRequested =
@@ -3838,8 +3466,8 @@ const validPdfGeneratorCommand =
           ? validPdfGeneratorCommand
 
           : isPdfRequest(
-              cleanUserMessage
-            );
+            cleanUserMessage
+          );
 
 
       // ================================================
@@ -3934,14 +3562,14 @@ const validPdfGeneratorCommand =
               (chat) =>
 
                 chat.id ===
-                activeChatId
+                  activeChatId
 
                   ? {
-                      ...chat,
+                    ...chat,
 
-                      messages:
-                        updatedMessages,
-                    }
+                    messages:
+                      updatedMessages,
+                  }
 
                   : chat
             )
@@ -4084,14 +3712,14 @@ const validPdfGeneratorCommand =
             (chat) =>
 
               chat.id ===
-              activeChatId
+                activeChatId
 
                 ? {
-                    ...chat,
+                  ...chat,
 
-                    messages:
-                      updatedMessages,
-                  }
+                  messages:
+                    updatedMessages,
+                }
 
                 : chat
           )
@@ -4113,7 +3741,7 @@ const validPdfGeneratorCommand =
 
       const aiMessage =
         updatedMessages[
-          assistantIndex
+        assistantIndex
         ];
 
 
@@ -4134,8 +3762,8 @@ const validPdfGeneratorCommand =
           file:
             fileForAI,
 
-files:
-  filesForAI,
+          files:
+            filesForAI,
 
           history:
             updatedMessages.slice(
@@ -4162,7 +3790,7 @@ files:
 
         });
 
-stopThinking();
+        stopThinking();
 
         return true;
 
@@ -4190,52 +3818,52 @@ stopThinking();
   // STOP GENERATION
   // ====================================================
 
-const stop = async () => {
-stopGeneration();
+  const stop = async () => {
+    stopGeneration();
 
-stopThinking();
+    stopThinking();
 
-setIsThinking(false);
+    setIsThinking(false);
 
-  setChats((prev) =>
-    prev.map((chat) => {
-      if (chat.id !== activeChatId) return chat;
+    setChats((prev) =>
+      prev.map((chat) => {
+        if (chat.id !== activeChatId) return chat;
 
-      const messages = [...chat.messages];
+        const messages = [...chat.messages];
 
-      const lastMessage = messages[messages.length - 1];
+        const lastMessage = messages[messages.length - 1];
 
-      if (
-        lastMessage &&
-        lastMessage.role === "assistant" &&
-        !lastMessage.message.trim()
-      ) {
-        messages.pop();
-      }
+        if (
+          lastMessage &&
+          lastMessage.role === "assistant" &&
+          !lastMessage.message.trim()
+        ) {
+          messages.pop();
+        }
 
-      saveMessages(activeChatId, messages).catch(console.error);
+        saveMessages(activeChatId, messages).catch(console.error);
 
-      return {
-        ...chat,
-        messages,
-      };
-    })
-  );
-};
+        return {
+          ...chat,
+          messages,
+        };
+      })
+    );
+  };
 
 
   // ====================================================
   // RETURN
   // ====================================================
 
-return {
-  send,
-  regenerate,
-  editMessage,
-  stop,
-  isThinking,
-  thinkingText,
-  attachmentError,
-  clearAttachmentError,
-};
+  return {
+    send,
+    regenerate,
+    editMessage,
+    stop,
+    isThinking,
+    thinkingText,
+    attachmentError,
+    clearAttachmentError,
+  };
 }

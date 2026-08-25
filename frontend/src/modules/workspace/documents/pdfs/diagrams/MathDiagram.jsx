@@ -4352,19 +4352,212 @@ function UniversalVectorScene({
 
     const padding = 20;
 
-    const [minX, maxX] =
+    let [minX, maxX] =
         safeRange(
             xRange,
             -10,
             10
         );
 
-    const [minY, maxY] =
+    let [minY, maxY] =
         safeRange(
             yRange,
             -10,
             10
         );
+
+    const sceneBoundsX = [];
+    const sceneBoundsY = [];
+
+    const addSceneBoundsPoint = (x, y) => {
+        if (
+            Number.isFinite(Number(x)) &&
+            Number.isFinite(Number(y))
+        ) {
+            sceneBoundsX.push(Number(x));
+            sceneBoundsY.push(Number(y));
+        }
+    };
+
+    points.forEach(point => {
+        addSceneBoundsPoint(
+            point?.x,
+            point?.y
+        );
+    });
+
+    lines.forEach(line => {
+        addSceneBoundsPoint(
+            line?.x1,
+            line?.y1
+        );
+
+        addSceneBoundsPoint(
+            line?.x2,
+            line?.y2
+        );
+    });
+
+    arrows.forEach(arrow => {
+        addSceneBoundsPoint(
+            arrow?.x1,
+            arrow?.y1
+        );
+
+        addSceneBoundsPoint(
+            arrow?.x2,
+            arrow?.y2
+        );
+    });
+
+    circles.forEach(circle => {
+        const cx = finite(circle?.cx);
+        const cy = finite(circle?.cy);
+        const radius = Math.abs(
+            finite(circle?.r, 0)
+        );
+
+        addSceneBoundsPoint(
+            cx - radius,
+            cy - radius
+        );
+
+        addSceneBoundsPoint(
+            cx + radius,
+            cy + radius
+        );
+    });
+
+    ellipses.forEach(ellipse => {
+        const cx = finite(ellipse?.cx);
+        const cy = finite(ellipse?.cy);
+        const rx = Math.abs(
+            finite(ellipse?.rx, 0)
+        );
+        const ry = Math.abs(
+            finite(ellipse?.ry, 0)
+        );
+
+        addSceneBoundsPoint(
+            cx - rx,
+            cy - ry
+        );
+
+        addSceneBoundsPoint(
+            cx + rx,
+            cy + ry
+        );
+    });
+
+    rectangles.forEach(rectangle => {
+        const x = finite(rectangle?.x);
+        const y = finite(rectangle?.y);
+        const widthValue = Math.abs(
+            finite(rectangle?.width, 0)
+        );
+        const heightValue = Math.abs(
+            finite(rectangle?.height, 0)
+        );
+
+        addSceneBoundsPoint(
+            x,
+            y
+        );
+
+        addSceneBoundsPoint(
+            x + widthValue,
+            y + heightValue
+        );
+    });
+
+    polygons.forEach(polygon => {
+        const polygonPoints =
+            Array.isArray(polygon)
+                ? polygon
+                : Array.isArray(polygon?.points)
+                    ? polygon.points
+                    : [];
+
+        polygonPoints.forEach(point => {
+            addSceneBoundsPoint(
+                point?.x,
+                point?.y
+            );
+        });
+    });
+
+    arcs.forEach(arc => {
+        const cx = finite(arc?.cx);
+        const cy = finite(arc?.cy);
+        const radius = Math.abs(
+            finite(arc?.r, 0)
+        );
+
+        addSceneBoundsPoint(
+            cx - radius,
+            cy - radius
+        );
+
+        addSceneBoundsPoint(
+            cx + radius,
+            cy + radius
+        );
+    });
+
+    labels.forEach(label => {
+        addSceneBoundsPoint(
+            label?.x,
+            label?.y
+        );
+    });
+
+    if (sceneBoundsX.length) {
+        const geometryMinX =
+            Math.min(...sceneBoundsX);
+        const geometryMaxX =
+            Math.max(...sceneBoundsX);
+        const geometryMinY =
+            Math.min(...sceneBoundsY);
+        const geometryMaxY =
+            Math.max(...sceneBoundsY);
+
+        const geometryWidth =
+            Math.max(
+                geometryMaxX - geometryMinX,
+                1
+            );
+
+        const geometryHeight =
+            Math.max(
+                geometryMaxY - geometryMinY,
+                1
+            );
+
+        const marginX =
+            geometryWidth * 0.08;
+        const marginY =
+            geometryHeight * 0.08;
+
+        minX = Math.min(
+            minX,
+            geometryMinX - marginX
+        );
+
+        maxX = Math.max(
+            maxX,
+            geometryMaxX + marginX
+        );
+
+        minY = Math.min(
+            minY,
+            geometryMinY - marginY
+        );
+
+        maxY = Math.max(
+            maxY,
+            geometryMaxY + marginY
+        );
+    }
 
     const elements = [];
 

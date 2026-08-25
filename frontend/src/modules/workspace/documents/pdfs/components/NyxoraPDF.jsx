@@ -5617,17 +5617,21 @@ let codeLines = [];
 
 const pushCurrentSection = () => {
 
-if(
+  if(
+    currentSection.questions.length
+  ){
 
-currentSection.title &&
+    sections.push({
 
-currentSection.questions.length
+      ...currentSection,
 
-){
+      title:
+        currentSection.title ||
+        "Questions",
 
-sections.push(currentSection);
+    });
 
-}
+  }
 
 };
 
@@ -6252,7 +6256,7 @@ const hindiQuestionMatch =
 
 clean.match(
 
-/^प्र(?:श्न)?\s*(\d+)[.)]/u
+/^प्र(?:श्न)?\s*(\d+)\s*[:.)-]/u
 
 );
 
@@ -6262,7 +6266,7 @@ const normalQuestionMatch =
 
 clean.match(
 
-/^(?:Q\s*)?(\d+)[.)]/i
+/^(?:(?:Question|Q)\s*)?(\d+)\s*[:.)-]/i
 
 );
 
@@ -6292,7 +6296,7 @@ text:clean
 
 .replace(
 
-/^प्र(?:श्न)?\s*\d+[.)]\s*/u,
+/^प्र(?:श्न)?\s*\d+\s*[:.)-]\s*/u,
 
 ""
 
@@ -6300,7 +6304,7 @@ text:clean
 
 .replace(
 
-/^(?:Q\s*)?\d+[.)]\s*/i,
+/^(?:(?:Question|Q)\s*)?\d+\s*[:.)-]\s*/i,
 
 ""
 
@@ -6443,8 +6447,23 @@ pushCurrentSection();
 
 pushCurrentAnswerSection();
 
-
-
+console.log(
+    "NYXORA PARSE RESULT:",
+    {
+        sections: sections.map(section => ({
+            title: section?.title || "",
+            questionCount: Array.isArray(section?.questions)
+                ? section.questions.length
+                : 0
+        })),
+        answerSections: answerSections.map(section => ({
+            title: section?.title || "",
+            questionCount: Array.isArray(section?.questions)
+                ? section.questions.length
+                : 0
+        }))
+    }
+);
 
 if(
     options.isProgrammingTest === true

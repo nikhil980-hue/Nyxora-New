@@ -13,6 +13,7 @@ import Login from "../pages/Login";
 import Register from "../pages/Register";
 import ForgotPassword from "../pages/ForgotPassword";
 import NotFound from "../pages/NotFound";
+import Profile from "../pages/Profile";
 
 
 import Home from "../modules/home/pages/Home";
@@ -42,7 +43,7 @@ import Notes
 import Presentation
   from "../modules/presentation/pages/Presentation";
 
-  
+
 import ProtectedRoute from "./ProtectedRoute";
 
 
@@ -101,8 +102,6 @@ export default function AppRoutes() {
 
 
 
-
-
         {/* DASHBOARD */}
 
 
@@ -120,6 +119,42 @@ export default function AppRoutes() {
 
 
                 <Home />
+
+
+              </MainLayout>
+
+
+            </ProtectedRoute>
+
+
+          }
+
+        />
+
+
+
+
+
+
+
+
+        {/* PROFILE */}
+
+
+        <Route
+
+          path="/profile"
+
+          element={
+
+
+            <ProtectedRoute>
+
+
+              <MainLayout>
+
+
+                <Profile />
 
 
               </MainLayout>

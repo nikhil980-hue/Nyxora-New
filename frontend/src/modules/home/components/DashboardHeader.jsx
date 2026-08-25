@@ -1,11 +1,17 @@
 import {
-  Bell,
-  Search,
   Sparkles,
 } from "lucide-react";
 
+import {
+  useNavigate,
+} from "react-router-dom";
+
 
 export default function DashboardHeader() {
+
+
+  const navigate =
+    useNavigate();
 
 
   const hour =
@@ -27,6 +33,16 @@ export default function DashboardHeader() {
       "Good Afternoon";
 
   }
+
+
+  const handleProfileClick =
+    () => {
+
+      navigate(
+        "/profile"
+      );
+
+    };
 
 
   return (
@@ -235,164 +251,11 @@ export default function DashboardHeader() {
             flex
             w-full
             items-center
+            justify-end
             gap-3
             lg:w-auto
           "
         >
-
-
-          {/* ==================================================
-              SEARCH
-          ================================================== */}
-
-          <div
-            className="
-              group
-              flex
-              min-w-0
-              flex-1
-              items-center
-              rounded-xl
-              border
-              border-white/[0.08]
-              bg-[#0B1020]/90
-              px-4
-              py-3
-              transition-all
-              duration-300
-              focus-within:border-violet-400/40
-              focus-within:bg-[#0D1324]
-              focus-within:shadow-[0_0_0_3px_rgba(124,58,237,.07),0_0_25px_rgba(124,58,237,.06)]
-              lg:w-72
-              lg:flex-none
-            "
-          >
-
-
-            <Search
-
-              size={18}
-
-              className="
-                shrink-0
-                text-slate-500
-                transition-colors
-                duration-300
-                group-focus-within:text-violet-300
-              "
-
-            />
-
-
-            <input
-
-              type="text"
-
-              placeholder="Search workspace..."
-
-              className="
-                ml-3
-                w-full
-                bg-transparent
-                text-sm
-                text-white
-                outline-none
-                placeholder:text-slate-600
-              "
-
-            />
-
-
-            <div
-              className="
-                ml-2
-                hidden
-                rounded-md
-                border
-                border-white/[0.07]
-                bg-white/[0.03]
-                px-1.5
-                py-0.5
-                text-[10px]
-                text-slate-600
-                sm:block
-              "
-            >
-
-              /
-
-            </div>
-
-
-          </div>
-
-
-
-          {/* ==================================================
-              NOTIFICATION BUTTON
-          ================================================== */}
-
-          <button
-
-            type="button"
-
-            className="
-              group
-              relative
-              flex
-              h-12
-              w-12
-              shrink-0
-              items-center
-              justify-center
-              rounded-xl
-              border
-              border-white/[0.08]
-              bg-[#0B1020]/90
-              transition-all
-              duration-300
-              hover:border-violet-400/25
-              hover:bg-violet-500/[0.07]
-              hover:shadow-[0_0_25px_rgba(124,58,237,.08)]
-            "
-
-          >
-
-
-            <Bell
-
-              size={19}
-
-              className="
-                text-slate-300
-                transition-colors
-                duration-300
-                group-hover:text-violet-200
-              "
-
-            />
-
-
-            {/* NOTIFICATION INDICATOR */}
-
-            <span
-              className="
-                absolute
-                right-[9px]
-                top-[8px]
-                h-2
-                w-2
-                rounded-full
-                border
-                border-[#0B1020]
-                bg-fuchsia-400
-                shadow-[0_0_8px_rgba(217,70,239,.9)]
-              "
-            />
-
-
-          </button>
-
 
 
           {/* ==================================================
@@ -402,6 +265,14 @@ export default function DashboardHeader() {
           <button
 
             type="button"
+
+            onClick={
+              handleProfileClick
+            }
+
+            aria-label="Open profile"
+
+            title="Profile"
 
             className="
               group
@@ -423,6 +294,9 @@ export default function DashboardHeader() {
               duration-300
               hover:scale-[1.04]
               hover:shadow-[0_0_28px_rgba(124,58,237,.28)]
+              focus:outline-none
+              focus:ring-2
+              focus:ring-violet-400/40
             "
 
           >
@@ -488,6 +362,5 @@ export default function DashboardHeader() {
     </div>
 
   );
-
 
 }

@@ -5,6 +5,7 @@ import {
   Sparkles,
   Menu,
   X,
+  ArrowLeft,
 } from "lucide-react";
 
 import ChatSearch from "./ChatSearch";
@@ -45,6 +46,15 @@ export default function ChatSidebar({
     mobileOpen,
     setMobileOpen,
   ] = useState(false);
+
+  const handleBack =
+  () => {
+
+    window.history.back();
+
+  };
+
+  
 
 
   // ==================================================
@@ -337,23 +347,66 @@ export default function ChatSidebar({
           "
         >
 
-          <div
-            className="
-              flex
-              items-center
-              gap-3
-            "
-          >
+<div
+  className="
+    flex
+    items-center
+    gap-2.5
+  "
+>
 
-            <NyxoraLogo
-              size={46}
-              animated={true}
-            />
+  {/* BACK BUTTON */}
+
+<button
+  type="button"
+  onClick={handleBack}
+  aria-label="Go back"
+  title="Back"
+  className="
+    group
+    flex
+    h-8
+    w-8
+    shrink-0
+    items-center
+    justify-center
+    rounded-full
+    border
+    border-white/[0.08]
+    bg-white/[0.025]
+    text-slate-500
+    transition-all
+    duration-300
+    hover:border-violet-400/25
+    hover:bg-violet-500/[0.08]
+    hover:text-violet-200
+  "
+>
+  <ArrowLeft
+    size={14}
+    strokeWidth={1.8}
+    className="
+      transition-transform
+      duration-300
+      group-hover:-translate-x-0.5
+    "
+  />
+</button>
 
 
-            <div
-              className="min-w-0"
-            >
+  {/* NYXORA LOGO */}
+
+  <NyxoraLogo
+    size={46}
+    animated={true}
+  />
+
+
+  <div
+    className="
+      min-w-0
+    "
+  >
 
               <div
                 className="
