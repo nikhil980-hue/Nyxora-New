@@ -5,13 +5,34 @@ dotenv.config();
 
 
 // ======================================================
-// GEMINI CLIENT
+// GEMINI API KEY ROTATION
 // ======================================================
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+const API_KEYS = [
+  process.env.GEMINI_API_KEY_1,
+  process.env.GEMINI_API_KEY_2,
+  process.env.GEMINI_API_KEY_3,
+  process.env.GEMINI_API_KEY_4,
+  process.env.GEMINI_API_KEY_5,
+  process.env.GEMINI_API_KEY_6,
+  process.env.GEMINI_API_KEY_7,
+  process.env.GEMINI_API_KEY_8,
+  process.env.GEMINI_API_KEY_9,
+  process.env.GEMINI_API_KEY_10,
+  process.env.GEMINI_API_KEY_11,
+  process.env.GEMINI_API_KEY_12,
+  process.env.GEMINI_API_KEY_13,
+  process.env.GEMINI_API_KEY_14,
+  process.env.GEMINI_API_KEY_15,
+].filter(Boolean);
 
+if (API_KEYS.length === 0) {
+  throw new Error("No Gemini API keys found.");
+}
+
+function getAIClient(apiKey) {
+  return new GoogleGenAI({ apiKey });
+}
 
 // ======================================================
 // MODELS
@@ -1600,6 +1621,7 @@ function createExistingMemoryContext(
 // ======================================================
 
 async function extractUsingModel(
+  apiKey,
   model,
   message,
   existingMemory
@@ -1611,8 +1633,10 @@ async function extractUsingModel(
     );
 
 
-  const response =
-    await ai.models.generateContent({
+const ai = getAIClient(apiKey);
+
+const response =
+  await ai.models.generateContent({
 
       model,
 
@@ -1709,10 +1733,13 @@ export async function extractMemory(
   let lastError = null;
 
 
-  for (
-    const model
-    of MODELS
-  ) {
+for (const apiKey of API_KEYS) {
+
+  console.log(
+    `Using API key ${API_KEYS.indexOf(apiKey) + 1}/${API_KEYS.length}`
+  );
+
+  for (const model of MODELS) {
 
     try {
 
@@ -1720,18 +1747,13 @@ export async function extractMemory(
         `🧠 Memory extraction using: ${model}`
       );
 
-
       const operations =
         await extractUsingModel(
-
+          apiKey,
           model,
-
           message.trim(),
-
           memoryContext
-
         );
-
 
       if (
         !hasMemoryChanges(
@@ -1743,17 +1765,14 @@ export async function extractMemory(
           "🧠 No useful long-term memory changes found."
         );
 
-
         return {};
 
       }
-
 
       console.log(
         "🧠 Memory changes extracted:",
         operations
       );
-
 
       return operations;
 
@@ -1762,16 +1781,16 @@ export async function extractMemory(
       lastError =
         error;
 
-
       console.error(
-        `❌ Memory extraction failed with ${model}:`,
-        error.message ||
-          error
+        `❌ Memory extraction failed with ${model} using API key ${API_KEYS.indexOf(apiKey) + 1}:`,
+        error.message || error
       );
 
     }
 
   }
+
+}
 
 
   console.error(
