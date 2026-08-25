@@ -85,7 +85,7 @@ export default function NyxoraLogo({
 
       <svg
 
-        width={size}
+        width="100"
 
         height={size}
 

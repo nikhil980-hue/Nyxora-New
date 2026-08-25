@@ -82,21 +82,23 @@ async function generateGeminiImage(
 
       const response =
 
-await ai.models.generateContent({
+      await ai.models.generateContent({
 
-  model,
+        model,
 
-  contents:[
 
-    {
+        contents:[
 
-      role:"user",
+          {
 
-      parts:[
+            role:"user",
 
-        {
 
-          text:
+            parts:[
+
+              {
+
+                text:
 
 `Create a premium presentation image.
 
@@ -112,23 +114,21 @@ Style:
 - No text
 - No watermark`
 
-        }
+              }
 
-      ]
+            ]
 
-    }
+          }
 
-  ],
+        ]
 
-  config: {
 
-    responseModalities: [
-      "IMAGE"
-    ],
+      });
 
-  }
 
-});
+
+
+
 
 
       const imagePart =
