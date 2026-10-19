@@ -92,9 +92,9 @@ const COLORS = [
 //
 // ✓ Existing slides preserved
 // ✓ Existing diagram slides preserved
-// ✓ Detects whether PPT already has a flow/diagram
-// ✓ Automatically adds circular flow slide if missing
-// ✓ Never duplicates an existing diagram unnecessarily
+// ✓ Uses ONLY the slides returned by the presentation generator
+// ✓ Does NOT add automatic filler/flow slides
+// ✓ Requested slide count is preserved during export
 // ======================================================
 
 export async function exportPresentationToPpt({
@@ -171,63 +171,8 @@ export async function exportPresentationToPpt({
 
 
   // ==================================================
-  // GUARANTEE ONE FLOW CHART
-  // ==================================================
-
-  const hasFlowChart =
-    presentationHasFlowChart(
-      slides
-    );
-
-
-  if (!hasFlowChart) {
-
-    const automaticFlowSlide =
-      createAutomaticFlowSlide(
-        presentation,
-        slides
-      );
-
-
-    if (automaticFlowSlide) {
-
-      // Keep summary/conclusion as the final slide
-      // whenever possible.
-
-      const summaryIndex =
-        slides.findIndex(
-          slide =>
-            isSummaryLikeSlide(
-              slide
-            )
-        );
-
-
-      if (
-        summaryIndex !== -1
-      ) {
-
-        slides.splice(
-          summaryIndex,
-          0,
-          automaticFlowSlide
-        );
-
-      } else {
-
-        slides.push(
-          automaticFlowSlide
-        );
-
-      }
-
-    }
-
-  }
-
-
-  // ==================================================
   // CREATE ALL SLIDES
+
   // ==================================================
 
   for (
@@ -284,6 +229,242 @@ export async function exportPresentationToPpt({
 
 }
 // ======================================================
+// ADAPT CUSTOM SLIDE TO EXISTING NYXORA CONTENT STYLE
+//
+// This is NOT a new visual style.
+//
+// It only converts the user's pasted custom content into
+// the same data structure already consumed by
+// createContentSlide().
+//
+// The actual rendering is therefore identical to normal
+// Nyxora content slides:
+// ✓ same background
+// ✓ same header
+// ✓ same numbered bubbles
+// ✓ same generated-image system
+// ✓ same insight card
+// ✓ same adaptive image layouts
+// ======================================================
+
+function adaptCustomSlideToNyxoraContent(
+  slide
+) {
+  const source = String(
+    slide?.rawContent ??
+    slide?.customContent ??
+    ""
+  )
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+
+
+  const lines =
+    source
+      .split("\n")
+      .map(
+        line =>
+          String(line || "").trim()
+      )
+      .filter(
+        line =>
+          line &&
+          !/^-{3,}$/.test(line)
+      );
+
+
+  if (
+    lines.length === 0
+  ) {
+    return {
+      ...slide,
+      type: "content",
+      layout: "content",
+      title:
+        slide?.title ||
+        "Custom Content",
+      headline: "",
+      subtitle: "",
+      points: [],
+      keyTakeaway: "",
+    };
+  }
+
+
+  // First meaningful line becomes the normal Nyxora
+  // slide title. It is not duplicated in the points.
+  let titleIndex =
+    lines.findIndex(
+      line =>
+        /^\s*#{1,6}\s+/.test(line)
+    );
+
+
+  if (
+    titleIndex < 0
+  ) {
+    titleIndex = 0;
+  }
+
+
+  const title =
+    cleanCustomMarkdownLine(
+      lines[titleIndex]
+    );
+
+
+  const body =
+    lines
+      .filter(
+        (_, index) =>
+          index !== titleIndex
+      )
+      .map(
+        line =>
+          cleanCustomContentForPoint(
+            line
+          )
+      )
+      .filter(Boolean);
+
+
+  // The existing Nyxora renderer expects point-like
+  // content. Group source lines into at most five points
+  // without asking AI to rewrite them.
+  const points =
+    groupCustomContentForExistingStyle(
+      body,
+      5
+    );
+
+
+  return {
+    ...slide,
+
+    type: "content",
+
+    layout: "content",
+
+    title:
+      title ||
+      "Custom Content",
+
+    subtitle: "",
+
+    headline: "",
+
+    points,
+
+    bullets: points,
+
+    items: points,
+
+    keyTakeaway: "",
+
+    description: "",
+
+    isCustomContent: false,
+  };
+}
+
+
+// ======================================================
+// GROUP CUSTOM CONTENT FOR EXISTING NYXORA BUBBLES
+//
+// No new visual behavior is introduced here.
+// This only prepares the custom text for the existing
+// numbered-bubble renderer.
+// ======================================================
+
+function groupCustomContentForExistingStyle(
+  lines,
+  maxGroups = 5
+) {
+  if (
+    !Array.isArray(lines) ||
+    lines.length === 0
+  ) {
+    return [];
+  }
+
+
+  const groupCount =
+    Math.min(
+      maxGroups,
+      lines.length
+    );
+
+
+  const groups = [];
+
+  let cursor = 0;
+
+
+  for (
+    let index = 0;
+    index < groupCount;
+    index++
+  ) {
+    const remaining =
+      lines.length -
+      cursor;
+
+    const groupsLeft =
+      groupCount -
+      index;
+
+    const take =
+      Math.ceil(
+        remaining /
+        groupsLeft
+      );
+
+
+    const group =
+      lines
+        .slice(
+          cursor,
+          cursor + take
+        )
+        .join("\n")
+        .trim();
+
+
+    if (group) {
+      groups.push(group);
+    }
+
+
+    cursor += take;
+  }
+
+
+  return groups;
+}
+
+
+// ======================================================
+// CUSTOM TEXT CLEANING
+//
+// Only removes presentation markup such as Markdown
+// bullets/headings. The actual words are retained.
+// ======================================================
+
+function cleanCustomContentForPoint(
+  line
+) {
+  return cleanCustomMarkdownLine(
+    String(line || "")
+  )
+    .replace(
+      /^\s*(?:[-*+]\s+|\d+[.)]\s+)/,
+      ""
+    )
+    .trim();
+}
+
+
+// ======================================================
 // CREATE SLIDE
 //
 // CENTRAL SLIDE ROUTER
@@ -334,6 +515,10 @@ async function createSlide({
 
   // ==================================================
   // RESOLVE LAYOUT
+  //
+  // Custom Mode is connected directly to Nyxora's
+  // existing content renderer below. It does NOT have
+  // a separate custom visual style.
   // ==================================================
 
   const requestedLayout =
@@ -341,6 +526,49 @@ async function createSlide({
       slide?.layout ||
       "content"
     ).toLowerCase();
+
+
+  if (
+    requestedLayout === "custom" ||
+    slide?.type === "custom" ||
+    slide?.isCustomContent === true
+  ) {
+
+    const adaptedSlide =
+      adaptCustomSlideToNyxoraContent(
+        slide
+      );
+
+    if (
+      theme?.templateId &&
+      theme.templateId !== "nyxoraOriginal"
+    ) {
+      await createReferenceTemplateSlide(
+        page,
+        adaptedSlide,
+        presentation,
+        theme,
+        "content",
+        index
+      );
+    }
+    else {
+      await createContentSlide(
+        page,
+        adaptedSlide,
+        theme
+      );
+    }
+
+    addSlideNumber(
+      page,
+      index,
+      theme
+    );
+
+    return page;
+
+  }
 
 
   const resolvedLayout =
@@ -355,6 +583,38 @@ async function createSlide({
       requestedLayout ||
       "content"
     ).toLowerCase();
+
+
+  // ==================================================
+  // REFERENCE TEMPLATE ENGINE
+  //
+  // Nyxora Original remains on the original renderer.
+  // Reference templates use their own compositions while
+  // consuming the same AI slide JSON and Pexels image
+  // pipeline.
+  // ==================================================
+
+  if (
+    theme?.templateId &&
+    theme.templateId !== "nyxoraOriginal"
+  ) {
+    await createReferenceTemplateSlide(
+      page,
+      slide,
+      presentation,
+      theme,
+      layout,
+      index
+    );
+
+    addSlideNumber(
+      page,
+      index,
+      theme
+    );
+
+    return page;
+  }
 
 
   // ==================================================
@@ -1093,6 +1353,17 @@ function applyPremiumBackground(
       ),
 
   };
+
+
+  // Reference templates own the entire visual canvas.
+  // Do not add Nyxora Original's multicolour bar or dots
+  // to reference-driven slides.
+  if (
+    theme?.templateId &&
+    theme.templateId !== "nyxoraOriginal"
+  ) {
+    return;
+  }
 
 
   // Keep the premium multicolour line ONLY
@@ -2330,6 +2601,237 @@ function addTitleIcon(
 
   );
 
+}
+
+
+// ======================================================
+// EXACT CUSTOM CONTENT SLIDE
+//
+// Custom Mode rules:
+// ✓ Uses the user's pasted content directly
+// ✓ Does not call AI
+// ✓ Does not summarize or rewrite
+// ✓ Adds only decorative visuals from the existing visual service
+// ✓ Does not add filler/flow/comparison content
+// ✓ Keeps Nyxora's existing presentation template
+// ✓ Converts simple Markdown markers into visual formatting
+//   without changing the actual words/content
+// ======================================================
+
+// ======================================================
+// CUSTOM MARKDOWN RENDERER
+//
+// The pasted syllabus uses Markdown-like formatting.
+// We remove presentation syntax such as **bold**, ## headings,
+// `LAB`, and --- separators, but keep the actual content.
+// ======================================================
+
+function renderCustomMarkdownLines(
+  page,
+  lines,
+  theme,
+  area
+) {
+  let currentY = area.y;
+
+  const usableLines = lines.map(line => String(line ?? ""));
+
+  for (let index = 0; index < usableLines.length; index++) {
+    const originalLine = usableLines[index];
+    const trimmed = originalLine.trim();
+
+    if (!trimmed) {
+      currentY += 0.12;
+      continue;
+    }
+
+    // Markdown horizontal rule becomes a Nyxora divider.
+    if (/^-{3,}$/.test(trimmed)) {
+      page.addShape(
+        "line",
+        {
+          x: area.x,
+          y: currentY + 0.02,
+          w: area.w,
+          h: 0,
+          line: {
+            color: "CBD5E1",
+            width: 0.8,
+          },
+        }
+      );
+      currentY += 0.16;
+      continue;
+    }
+
+    const headingMatch = originalLine.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+
+    if (headingMatch) {
+      const heading = cleanCustomInlineMarkdown(headingMatch[2]);
+
+      page.addText(
+        heading,
+        {
+          x: area.x,
+          y: currentY,
+          w: area.w,
+          h: 0.34,
+          fontSize: headingMatch[1].length <= 2 ? 18 : 15,
+          bold: true,
+          color: cleanColor(theme.colors.text),
+          margin: 0,
+          fit: "shrink",
+        }
+      );
+
+      currentY += headingMatch[1].length <= 2 ? 0.42 : 0.34;
+      continue;
+    }
+
+    const cleaned = cleanCustomMarkdownLine(originalLine);
+
+    if (!cleaned) {
+      currentY += 0.08;
+      continue;
+    }
+
+    const isBullet = /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(originalLine);
+    const isFooter = /^\s*\*?Footer:/i.test(originalLine);
+
+    const fontSize = isFooter ? 9 : isBullet ? 12.5 : 12;
+    const lineHeight = isFooter ? 0.26 : isBullet ? 0.42 : 0.38;
+
+    if (isBullet) {
+      const bulletMatch = originalLine.match(/^(\s*)([-*+]\s+|\d+[.)]\s+)(.*)$/);
+      const prefix = bulletMatch ? bulletMatch[2] : "";
+      const content = bulletMatch ? bulletMatch[3] : cleaned;
+      const visiblePrefix = /^\d/.test(prefix)
+        ? prefix
+        : "• ";
+
+      page.addText(
+        [
+          {
+            text: visiblePrefix,
+            options: {
+              bold: true,
+            },
+          },
+          ...customInlineRuns(content),
+        ],
+        {
+          x: area.x + 0.05,
+          y: currentY,
+          w: area.w - 0.1,
+          h: lineHeight,
+          fontSize,
+          color: cleanColor(theme.colors.text),
+          margin: 0,
+          breakLine: false,
+          fit: "shrink",
+          valign: "mid",
+        }
+      );
+    } else {
+      page.addText(
+        customInlineRuns(cleaned),
+        {
+          x: area.x,
+          y: currentY,
+          w: area.w,
+          h: lineHeight,
+          fontSize,
+          color: cleanColor(theme.colors.text),
+          margin: 0,
+          fit: "shrink",
+          valign: "mid",
+        }
+      );
+    }
+
+    currentY += lineHeight;
+
+    // Keep content inside the Nyxora card. The source itself is never
+    // deleted; if an unusually large single slide is supplied, PowerPoint
+    // is allowed to shrink the text inside the line boxes.
+    if (currentY > area.y + area.h) {
+      currentY = area.y + area.h;
+    }
+  }
+}
+
+
+function cleanCustomMarkdownLine(line) {
+  return cleanCustomInlineMarkdown(
+    String(line ?? "")
+      .replace(/^\s{0,3}#{1,6}\s+/, "")
+      .replace(/\s+#+\s*$/, "")
+      .replace(/^\s*\*Footer:/i, "Footer:")
+      .replace(/\*\s*$/, "")
+      .trim()
+  );
+}
+
+
+function cleanCustomInlineMarkdown(value) {
+  return String(value ?? "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/_([^_\n]+)_/g, "$1")
+    .trim();
+}
+
+
+function customInlineRuns(value) {
+  const text = String(value ?? "");
+  const runs = [];
+  let cursor = 0;
+  const pattern = /(\*\*|__)(.+?)\1|`([^`]+)`/g;
+  let match;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > cursor) {
+      runs.push({
+        text: cleanCustomInlineMarkdown(text.slice(cursor, match.index)),
+      });
+    }
+
+    if (match[3] !== undefined) {
+      runs.push({
+        text: match[3],
+        options: {
+          fontFace: "Courier New",
+        },
+      });
+    } else {
+      runs.push({
+        text: match[2],
+        options: {
+          bold: true,
+        },
+      });
+    }
+
+    cursor = match.index + match[0].length;
+  }
+
+  if (cursor < text.length) {
+    runs.push({
+      text: cleanCustomInlineMarkdown(text.slice(cursor)),
+    });
+  }
+
+  if (runs.length === 0) {
+    return [
+      {
+        text: cleanCustomInlineMarkdown(text),
+      },
+    ];
+  }
+
+  return runs.filter(run => run.text !== "");
 }
 
 
@@ -3798,6 +4300,11 @@ async function addGeneratedImageCard(
           "image",
 
         prompt,
+
+        // PPT presentations use the existing Pexels pipeline.
+        // Image Studio generation remains unchanged elsewhere.
+        source:
+          "pexels",
 
       });
 
@@ -7752,6 +8259,1832 @@ function splitIntoUsefulPoints(
 // SLIDE NUMBER
 // ======================================================
 
+
+// ======================================================
+// REFERENCE TEMPLATE DESIGN ENGINE — PREMIUM EDITION
+//
+// Three distinct editorial systems rebuilt around the supplied
+// reference decks. These are not recolors of Nyxora Original.
+// They deliberately avoid repetitive rounded-card layouts and
+// use photography, typography, negative space, image bands,
+// oversized numbering, rules and asymmetric compositions.
+//
+// 1. Engineering — editorial / architecture / print-magazine
+// 2. Aquatic — premium healthcare / fluid photography / waves
+// 3. Business — annual-report / corporate / data-editorial
+//
+// IMPORTANT:
+// - Nyxora Original + Modern Classroom remain untouched.
+// - Reference templates reuse the current AI slide JSON.
+// - PPT visuals continue through the existing Pexels pipeline.
+// - No Image Studio call is introduced here.
+// - Every reference slide awaits its Pexels image request.
+// ======================================================
+
+async function createReferenceTemplateSlide(
+  page,
+  slide,
+  presentation,
+  theme,
+  layout,
+  index
+) {
+  const templateId = String(theme?.templateId || '').trim().toLowerCase();
+  const normalizedLayout = String(layout || slide?.layout || 'content').trim().toLowerCase();
+
+  if (templateId === 'modernclassroom') {
+    return renderModernClassroomReferenceSlide(page, slide, presentation, theme, normalizedLayout, index);
+  }
+
+  if (templateId === 'engineering') {
+    return renderEngineeringReferenceSlide(page, slide, presentation, theme, normalizedLayout, index);
+  }
+
+  if (templateId === 'aquatic') {
+    return renderAquaticReferenceSlide(page, slide, presentation, theme, normalizedLayout, index);
+  }
+
+  if (templateId === 'businessannualreport') {
+    return renderBusinessReferenceSlide(page, slide, presentation, theme, normalizedLayout, index);
+  }
+
+  return createContentSlide(page, slide, theme);
+}
+
+// ======================================================
+// SHARED PREMIUM HELPERS
+// ======================================================
+
+function referenceValue(value, fallback = '') {
+  const cleaned = String(value ?? '').trim();
+  return cleaned || fallback;
+}
+
+function referenceTitle(slide, presentation) {
+  return referenceValue(slide?.title, referenceValue(presentation?.title, 'Presentation'));
+}
+
+function referenceSubtitle(slide, presentation, fallback = '') {
+  return referenceValue(
+    slide?.headline,
+    referenceValue(slide?.subtitle, referenceValue(presentation?.subtitle, fallback))
+  );
+}
+
+function referenceDescription(slide, presentation, fallback = '') {
+  const explicit = [
+    slide?.description,
+    slide?.keyTakeaway,
+    slide?.insight,
+    slide?.takeaway,
+    slide?.summary,
+    slide?.note,
+    slide?.supportingStatement,
+    slide?.headline,
+    presentation?.description,
+  ].find((value) => String(value ?? '').trim());
+
+  if (explicit) {
+    return String(explicit).trim();
+  }
+
+  const points = referencePoints(slide, 6);
+  return points[points.length - 1] || fallback;
+}
+
+function referencePoints(slide, max = 6) {
+  return normalizePoints(slide?.points || slide?.bullets || slide?.items || [])
+    .map((point) => String(point || '').trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+function referenceStepArrayCandidates(slide) {
+  return [
+    slide?.steps,
+    slide?.processSteps,
+    slide?.stages,
+    slide?.phases,
+    slide?.timeline,
+    slide?.timeline?.steps,
+    slide?.process?.steps,
+    slide?.flow?.steps,
+    slide?.workflow?.steps,
+    slide?.diagram?.steps,
+    slide?.diagram?.stages,
+  ];
+}
+
+function cleanReferenceStepLabel(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  return text
+    .replace(/^\s*(?:step|stage|phase|item)\s*[:\-]?\s*/i, '')
+    .replace(/^\s*\d{1,2}\s*[.)\/:-]\s*/, '')
+    .trim();
+}
+
+function referenceStepObject(item, index) {
+  if (typeof item === 'string') {
+    const value = cleanReferenceStepLabel(item);
+    return {
+      title: value || `Stage ${index + 1}`,
+      body: '',
+      phase: `${String(index + 1).padStart(2, '0')} / PHASE`,
+    };
+  }
+
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const titleCandidate =
+    item.title ??
+    item.name ??
+    item.label ??
+    item.heading ??
+    item.step ??
+    item.stage ??
+    item.phase ??
+    item.topic ??
+    item.value ??
+    '';
+
+  const bodyCandidate =
+    item.description ??
+    item.details ??
+    item.body ??
+    item.content ??
+    item.text ??
+    item.summary ??
+    item.explanation ??
+    '';
+
+  let title = cleanReferenceStepLabel(titleCandidate);
+  let body = String(bodyCandidate ?? '').trim();
+
+  const genericTitle = !title || /^(step|stage|phase|item)$/i.test(title);
+
+  if (genericTitle && body) {
+    const parts = body.split(/(?<=[.!?])\s+/).filter(Boolean);
+    title = cleanReferenceStepLabel(parts.shift() || body);
+    body = parts.join(' ').trim();
+  }
+
+  if (!title && body) {
+    const parts = body.split(/(?<=[.!?])\s+/).filter(Boolean);
+    title = cleanReferenceStepLabel(parts.shift() || body);
+    body = parts.join(' ').trim();
+  }
+
+  if (!title) {
+    title = `Stage ${index + 1}`;
+  }
+
+  const phase = cleanReferenceStepLabel(
+    item.phaseLabel ??
+    item.phaseName ??
+    item.category ??
+    item.type ??
+    item.phase ??
+    ''
+  );
+
+  return {
+    title,
+    body,
+    phase: phase ? phase.toUpperCase() : `${String(index + 1).padStart(2, '0')} / PHASE`,
+  };
+}
+
+function referenceProcessSteps(slide, max = 4) {
+  let raw = [];
+
+  for (const candidate of referenceStepArrayCandidates(slide)) {
+    if (Array.isArray(candidate) && candidate.length) {
+      raw = candidate;
+      break;
+    }
+  }
+
+  if (!raw.length) {
+    raw = referencePoints(slide, max);
+  }
+
+  const steps = raw
+    .map((item, index) => referenceStepObject(item, index))
+    .filter(Boolean);
+
+  if (!steps.length) {
+    const fallback = splitIntoUsefulPoints(
+      slide?.description || slide?.keyTakeaway || slide?.headline || ''
+    );
+    return fallback
+      .slice(0, max)
+      .map((value, index) => referenceStepObject(value, index));
+  }
+
+  return steps.slice(0, max);
+}
+
+function referenceFont(theme, kind = 'body') {
+  return theme?.typography?.[kind] || (kind === 'title' ? 'Georgia' : 'Segoe UI');
+}
+
+function referenceColor(theme, key, fallback) {
+  return cleanColor(theme?.colors?.[key] || fallback);
+}
+
+function safeReferenceBox(x = 0, y = 0, w = 1, h = 0.4, minW = 0.12, minH = 0.08) {
+  const rawX = Number.isFinite(Number(x)) ? Number(x) : 0;
+  const rawY = Number.isFinite(Number(y)) ? Number(y) : 0;
+  const rawW = Math.max(minW, Number.isFinite(Number(w)) ? Number(w) : minW);
+  const rawH = Math.max(minH, Number.isFinite(Number(h)) ? Number(h) : minH);
+  const safeX = Math.min(Math.max(rawX, 0), Math.max(0, SLIDE_WIDTH - minW));
+  const safeY = Math.min(Math.max(rawY, 0), Math.max(0, SLIDE_HEIGHT - minH));
+  return {
+    x: safeX,
+    y: safeY,
+    w: Math.min(rawW, Math.max(minW, SLIDE_WIDTH - safeX)),
+    h: Math.min(rawH, Math.max(minH, SLIDE_HEIGHT - safeY)),
+  };
+}
+
+function referenceText(page, text, options = {}) {
+  const value = String(text ?? '').trim();
+  if (!value) return;
+
+  const box = safeReferenceBox(
+    options.x ?? 0,
+    options.y ?? 0,
+    options.w ?? 1,
+    options.h ?? 0.4
+  );
+
+  page.addText(value, {
+    margin: 0,
+    breakLine: false,
+    fit: 'shrink',
+    valign: 'mid',
+    fontFace: options.fontFace || referenceFont(options.theme, 'body'),
+    color: options.color || referenceColor(options.theme, 'text', '111827'),
+    fontSize: options.fontSize || 16,
+    bold: Boolean(options.bold),
+    italic: Boolean(options.italic),
+    align: options.align || 'left',
+    charSpacing: options.charSpacing,
+    x: box.x,
+    y: box.y,
+    w: box.w,
+    h: box.h,
+    transparency: options.transparency,
+    breakLineOnTextOverflow: false,
+  });
+}
+
+function referenceLabel(page, text, x, y, w, color, theme) {
+  referenceText(page, String(text || '').toUpperCase(), {
+    theme,
+    x,
+    y,
+    w,
+    h: 0.2,
+    fontSize: 8.2,
+    bold: true,
+    charSpacing: 2,
+    color,
+  });
+}
+
+function addReferenceRule(page, x, y, w, color, width = 1) {
+  const box = safeReferenceBox(x, y, w, 0.01, 0.12, 0.01);
+  page.addShape('line', {
+    x: box.x,
+    y: box.y,
+    w: box.w,
+    h: 0,
+    line: { color: cleanColor(color), width },
+  });
+}
+
+function addReferenceRect(page, x, y, w, h, fill, transparency = 0, lineColor = 'FFFFFF', lineTransparency = 100) {
+  const box = safeReferenceBox(x, y, w, h);
+  page.addShape('rect', {
+    x: box.x,
+    y: box.y,
+    w: box.w,
+    h: box.h,
+    fill: { color: cleanColor(fill), transparency },
+    line: { color: cleanColor(lineColor), transparency: lineTransparency },
+  });
+}
+
+function addReferenceCircle(page, x, y, d, fill, transparency = 0, lineColor = 'FFFFFF', lineTransparency = 100, lineWidth = 1) {
+  const box = safeReferenceBox(x, y, d, d, 0.08, 0.08);
+  const diameter = Math.min(box.w, box.h);
+  page.addShape('ellipse', {
+    x: box.x,
+    y: box.y,
+    w: diameter,
+    h: diameter,
+    fill: { color: cleanColor(fill), transparency },
+    line: { color: cleanColor(lineColor), transparency: lineTransparency, width: lineWidth },
+  });
+}
+
+function addReferenceImageFailedMarker(page, box, theme, label = 'PHOTO') {
+  // Fail-safe only: this is intentionally quiet and never replaces a successful photo.
+  addReferenceRect(
+    page,
+    box.x,
+    box.y,
+    box.w,
+    box.h,
+    referenceColor(theme, 'surface', 'F4F0E8'),
+    0,
+    referenceColor(theme, 'border', 'D5D1CA'),
+    35
+  );
+  referenceLabel(
+    page,
+    label,
+    box.x + 0.18,
+    box.y + 0.16,
+    Math.min(box.w - 0.36, 1.0),
+    referenceColor(theme, 'mutedText', '777777'),
+    theme
+  );
+}
+
+function referenceTopic(slide, presentation) {
+  return referenceValue(
+    slide?.imagePrompt,
+    referenceValue(
+      slide?.title,
+      referenceValue(presentation?.title, 'professional presentation topic')
+    )
+  );
+}
+
+function referenceImagePrompt(slide, presentation, role = 'hero photograph') {
+  const topic = referenceTopic(slide, presentation);
+  const detail = referenceDescription(slide, presentation, 'supporting visual');
+  return `${topic}. ${detail}. Premium ${role} for a polished presentation; realistic Pexels editorial photography; subject-specific, professional lighting, natural depth, sophisticated composition, no text, no logos, no watermark, no UI, no collage labels.`;
+}
+
+async function addReferenceImage(page, slide, presentation, box, theme, role = 'hero photograph', radius = 0.02) {
+  const prompt = referenceImagePrompt(slide, presentation, role);
+  const safeBox = safeReferenceBox(box?.x, box?.y, box?.w, box?.h);
+  const ok = await addGeneratedImageCard(page, prompt, { ...safeBox, radius });
+  if (!ok) addReferenceImageFailedMarker(page, safeBox, theme, 'IMAGE');
+  return ok;
+}
+
+async function addReferenceImageFromPrompt(page, prompt, box, theme, radius = 0.02) {
+  const safeBox = safeReferenceBox(box?.x, box?.y, box?.w, box?.h);
+  const ok = await addGeneratedImageCard(page, String(prompt || ''), { ...safeBox, radius });
+  if (!ok) addReferenceImageFailedMarker(page, safeBox, theme, 'IMAGE');
+  return ok;
+}
+
+function addReferenceNumber(page, value, x, y, w, h, theme, colorOverride) {
+  referenceText(page, String(value).padStart(2, '0'), {
+    theme,
+    x,
+    y,
+    w,
+    h,
+    fontFace: referenceFont(theme, 'title'),
+    fontSize: 16,
+    bold: true,
+    color: colorOverride || referenceColor(theme, 'primary', '222222'),
+  });
+}
+
+function addEngineeringTopline(page, theme, index = 0) {
+  const taupe = referenceColor(theme, 'primary', '908269');
+  const pale = referenceColor(theme, 'secondary', 'CFC3AC');
+  addReferenceRect(page, 0, 0, 2.15, 0.08, taupe);
+  addReferenceRect(page, 2.15, 0, 2.15, 0.08, pale);
+  addReferenceRect(page, 4.30, 0, 1.1, 0.08, referenceColor(theme, 'tertiary', '976E26'));
+  referenceLabel(page, `NYXORA / ${String(index + 1).padStart(2, '0')}`, 10.72, 0.30, 1.72, taupe, theme);
+}
+
+function addAquaticWaves(page, theme, position = 'bottom') {
+  const c1 = referenceColor(theme, 'secondary', '9DCEDF');
+  const c2 = referenceColor(theme, 'tertiary', '80C9DD');
+  const c3 = referenceColor(theme, 'primary', '285E89');
+  const y = position === 'top' ? -0.02 : 6.86;
+  const svg = position === 'top'
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="120" viewBox="0 0 1600 120"><path d="M0 40 C240 88 420 8 650 36 S1090 96 1600 26 L1600 0 L0 0 Z" fill="#${c1}" fill-opacity="0.50"/><path d="M0 60 C220 106 470 20 730 48 S1160 108 1600 34 L1600 0 L0 0 Z" fill="#${c2}" fill-opacity="0.58"/><path d="M0 82 C260 124 520 32 800 58 S1230 116 1600 52 L1600 0 L0 0 Z" fill="#${c3}" fill-opacity="0.16"/></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="120" viewBox="0 0 1600 120"><path d="M0 76 C260 26 430 110 700 78 S1170 24 1600 82 L1600 120 L0 120 Z" fill="#${c1}" fill-opacity="0.55"/><path d="M0 56 C260 8 520 92 810 56 S1210 6 1600 68 L1600 120 L0 120 Z" fill="#${c2}" fill-opacity="0.52"/><path d="M0 40 C280 2 530 70 840 42 S1240 4 1600 52 L1600 120 L0 120 Z" fill="#${c3}" fill-opacity="0.18"/></svg>`;
+  page.addImage({ data: svgToDataUri(svg), x: 0, y, w: SLIDE_WIDTH, h: 0.64 });
+}
+
+function addAquaticWaterline(page, theme, x = 0.82, y = 5.92, w = 5.7) {
+  addReferenceRule(page, x, y, w, referenceColor(theme, 'secondary', '9DCEDF'), 4.2);
+  addReferenceRule(page, x + 0.42, y - 0.02, w * 0.53, referenceColor(theme, 'primary', '285E89'), 0.8);
+}
+
+function addBusinessGrid(page, theme, index = 0) {
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  const blue = referenceColor(theme, 'tertiary', '516CEE');
+  addReferenceRect(page, 0, 0, 1.45, 0.09, cyan);
+  addReferenceRect(page, 1.45, 0, 0.56, 0.09, blue);
+  addReferenceRect(page, 12.40, 0, 0.93, 0.09, cyan);
+
+  addReferenceRect(page, index % 2 === 0 ? 12.96 : 0.00, 1.30, 0.07, 4.72, blue, 8);
+  addReferenceRect(page, index % 2 === 0 ? 12.78 : 0.18, 1.52, 0.05, 3.68, cyan, 12);
+}
+
+function addBusinessDiagonal(page, theme, x, y, w, h, color, transparency = 0) {
+  const c = cleanColor(color);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700"><polygon points="0,700 1200,0 1200,160 260,700" fill="#${c}" fill-opacity="${1 - transparency / 100}"/></svg>`;
+  page.addImage({ data: svgToDataUri(svg), x, y, w, h });
+}
+
+// ======================================================
+// ENGINEERING — EDITORIAL PROJECT PROPOSAL
+// ======================================================
+
+async function renderEngineeringReferenceSlide(page, slide, presentation, theme, layout, index) {
+  switch (layout) {
+    case 'title':
+    case 'cover':
+    case 'hero':
+      return renderEngineeringCover(page, slide, presentation, theme, index);
+    case 'section-divider':
+      return renderEngineeringSection(page, slide, presentation, theme, index);
+    case 'full-image':
+      return renderEngineeringFullImage(page, slide, presentation, theme, index);
+    case 'quote':
+      return renderEngineeringQuote(page, slide, presentation, theme, index);
+    case 'stats':
+    case 'metric-grid':
+      return renderEngineeringStats(page, slide, presentation, theme, index);
+    case 'imageText':
+    case 'imagetext':
+    case 'two-column':
+      return renderEngineeringImageText(page, slide, presentation, theme, index);
+    case 'three-column':
+      return renderEngineeringThreeColumn(page, slide, presentation, theme, index);
+    case 'process':
+    case 'timeline':
+    case 'diagram':
+    case 'architecture':
+      return renderEngineeringProcess(page, slide, presentation, theme, index);
+    case 'comparison':
+    case 'before-after':
+      return renderEngineeringComparison(page, slide, presentation, theme, index);
+    case 'case-study':
+      return renderEngineeringImageText(page, slide, presentation, theme, index);
+    case 'testimonial':
+      return renderEngineeringQuote(page, slide, presentation, theme, index);
+    case 'key-takeaway':
+    case 'closing':
+    case 'summary':
+    case 'conclusion':
+      return renderEngineeringClosing(page, slide, presentation, theme, index);
+    default:
+      return renderEngineeringContent(page, slide, presentation, theme, index);
+  }
+}
+
+async function renderEngineeringCover(page, slide, presentation, theme, index) {
+  const taupe = referenceColor(theme, 'primary', '908269');
+  const pale = referenceColor(theme, 'surface', 'F4F0E8');
+  page.background = { color: referenceColor(theme, 'background', 'FFFFFF') };
+
+  await addReferenceImage(page, slide, presentation, { x: 6.88, y: 0, w: 6.45, h: 7.5 }, theme, 'architectural / project hero photograph', 0);
+  addReferenceRect(page, 0, 0, 7.38, 7.5, 'FFFFFF');
+  addReferenceRect(page, 5.76, 0.74, 1.72, 2.86, pale, 8);
+  addEngineeringTopline(page, theme, index);
+
+  referenceLabel(page, 'PROJECT PROPOSAL', 0.86, 0.98, 3.0, taupe, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.84, y: 1.52, w: 5.72, h: 1.84,
+    fontFace: referenceFont(theme, 'title'), fontSize: 42, bold: true,
+    color: referenceColor(theme, 'title', '212121'),
+  });
+  addReferenceRule(page, 0.86, 3.86, 1.64, taupe, 1.6);
+  referenceText(page, referenceSubtitle(slide, presentation, 'A structured visual story with project context and evidence.'), {
+    theme, x: 0.88, y: 4.08, w: 4.92, h: 0.92, fontSize: 15,
+    color: referenceColor(theme, 'text', '434343'),
+  });
+
+  referenceLabel(page, 'PREPARED FOR', 0.88, 5.38, 1.65, referenceColor(theme, 'secondary', 'CFC3AC'), theme);
+  referenceText(page, referenceValue(presentation?.organization, 'Nyxora AI'), {
+    theme, x: 0.88, y: 5.66, w: 4.1, h: 0.30, fontSize: 12, bold: true,
+    color: referenceColor(theme, 'text', '434343'),
+  });
+  referenceLabel(page, 'DATE', 4.10, 5.38, 0.9, taupe, theme);
+  referenceText(page, referenceValue(presentation?.date, getCurrentPresentationDate()), {
+    theme, x: 4.10, y: 5.66, w: 1.72, h: 0.30, fontSize: 12, bold: true,
+    color: referenceColor(theme, 'text', '434343'),
+  });
+
+  addReferenceNumber(page, index + 1, 0.88, 6.73, 0.65, 0.26, theme, taupe);
+}
+
+async function renderEngineeringSection(page, slide, presentation, theme, index) {
+  const taupe = referenceColor(theme, 'primary', '908269');
+  page.background = { color: referenceColor(theme, 'surface', 'F4F0E8') };
+  await addReferenceImage(page, slide, presentation, { x: 7.15, y: 0, w: 6.18, h: 7.5 }, theme, 'architecture or project detail photograph', 0);
+  addReferenceRect(page, 0, 0, 7.60, 7.5, referenceColor(theme, 'background', 'FFFFFF'), 2);
+  addReferenceRect(page, 5.55, 0.74, 2.05, 5.90, referenceColor(theme, 'secondary', 'CFC3AC'), 58);
+
+  referenceText(page, String(index + 1).padStart(2, '0'), {
+    theme, x: 0.88, y: 0.82, w: 1.22, h: 0.55,
+    fontFace: referenceFont(theme, 'title'), fontSize: 26, bold: true, color: taupe,
+  });
+  referenceLabel(page, 'SECTION', 0.90, 1.46, 1.12, taupe, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.86, y: 1.90, w: 5.72, h: 1.72,
+    fontFace: referenceFont(theme, 'title'), fontSize: 38, bold: true,
+    color: referenceColor(theme, 'title', '212121'),
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A new chapter in the story.'), {
+    theme, x: 0.90, y: 3.98, w: 4.88, h: 0.88, fontSize: 15,
+    color: referenceColor(theme, 'text', '434343'),
+  });
+  addReferenceRule(page, 0.90, 5.16, 1.90, taupe, 1.4);
+  referenceLabel(page, 'PROJECT / PROPOSAL', 0.90, 5.42, 2.24, referenceColor(theme, 'secondary', 'CFC3AC'), theme);
+  referenceText(page, referenceDescription(slide, presentation, 'Visual section opener.'), {
+    theme, x: 0.90, y: 5.78, w: 4.70, h: 0.64, fontSize: 11.5,
+    color: referenceColor(theme, 'mutedText', '595959'),
+  });
+}
+
+async function renderEngineeringContent(page, slide, presentation, theme, index) {
+  const taupe = referenceColor(theme, 'primary', '908269');
+  const points = referencePoints(slide, 5);
+  page.background = { color: referenceColor(theme, 'background', 'FFFFFF') };
+  addEngineeringTopline(page, theme, index);
+
+  referenceLabel(page, 'OVERVIEW', 0.84, 0.60, 1.8, taupe, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 0.94, w: 7.12, h: 0.78,
+    fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true,
+    color: referenceColor(theme, 'title', '212121'),
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'Key context and supporting evidence.'), {
+    theme, x: 0.84, y: 1.73, w: 6.44, h: 0.54, fontSize: 13.5,
+    color: referenceColor(theme, 'mutedText', '595959'),
+  });
+
+  await addReferenceImage(page, slide, presentation, { x: 8.06, y: 0.62, w: 4.47, h: 2.68 }, theme, 'clean editorial hero photograph', 0);
+  await addReferenceImageFromPrompt(
+    page,
+    `${referenceTopic(slide, presentation)} close-up detail photograph, premium Pexels editorial style, natural light, no text`,
+    { x: 7.86, y: 3.62, w: 2.16, h: 2.15 },
+    theme,
+    0
+  );
+  await addReferenceImageFromPrompt(
+    page,
+    `${referenceTopic(slide, presentation)} secondary contextual photograph, documentary editorial style, no text`,
+    { x: 10.20, y: 3.62, w: 2.33, h: 2.15 },
+    theme,
+    0
+  );
+
+  addReferenceRect(page, 0.82, 2.62, 6.50, 3.22, referenceColor(theme, 'surface', 'F4F0E8'), 0);
+  points.forEach((point, i) => {
+    const y = 2.98 + i * 0.54;
+    addReferenceNumber(page, i + 1, 1.08, y, 0.38, 0.24, theme, taupe);
+    addReferenceRule(page, 1.56, y + 0.17, 0.42, referenceColor(theme, 'secondary', 'CFC3AC'), 1);
+    referenceText(page, trimText(point, 132), {
+      theme, x: 2.12, y: y - 0.04, w: 4.66, h: 0.42, fontSize: 12,
+      color: referenceColor(theme, 'text', '434343'),
+    });
+  });
+
+  referenceLabel(page, 'EDITORIAL NOTE', 8.08, 6.16, 1.82, taupe, theme);
+  referenceText(page, referenceDescription(slide, presentation, 'A concise visual takeaway that supports the main point.'), {
+    theme, x: 8.08, y: 6.40, w: 4.46, h: 0.54,
+    fontFace: referenceFont(theme, 'title'), fontSize: 12.2, italic: true,
+    color: referenceColor(theme, 'title', '212121'),
+  });
+}
+
+async function renderEngineeringImageText(page, slide, presentation, theme, index) {
+  const taupe = referenceColor(theme, 'primary', '908269');
+  page.background = { color: referenceColor(theme, 'background', 'FFFFFF') };
+  addEngineeringTopline(page, theme, index);
+
+  referenceLabel(page, 'VISUAL STORY', 0.84, 0.58, 1.68, taupe, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 0.94, w: 4.45, h: 1.08,
+    fontFace: referenceFont(theme, 'title'), fontSize: 31, bold: true,
+    color: referenceColor(theme, 'title', '212121'),
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A focused narrative with an editorial visual anchor.'), {
+    theme, x: 0.84, y: 2.24, w: 4.28, h: 1.12, fontSize: 14,
+    color: referenceColor(theme, 'text', '434343'),
+  });
+  addReferenceRule(page, 0.84, 3.72, 1.66, taupe, 1.5);
+
+  await addReferenceImage(page, slide, presentation, { x: 5.34, y: 0.54, w: 7.14, h: 5.98 }, theme, 'large editorial project photograph', 0);
+
+  referenceLabel(page, 'DETAIL', 0.86, 4.18, 1.0, taupe, theme);
+  referenceText(page, referenceDescription(slide, presentation, 'Supporting note.'), {
+    theme, x: 0.86, y: 4.55, w: 3.88, h: 0.92, fontSize: 12,
+    color: referenceColor(theme, 'mutedText', '595959'),
+  });
+  referenceText(page, referenceValue(presentation?.author || presentation?.presenter, 'Nyxora AI'), {
+    theme, x: 0.86, y: 6.02, w: 3.4, h: 0.26, fontSize: 10.5, bold: true,
+    color: taupe,
+  });
+}
+
+async function renderEngineeringThreeColumn(page, slide, presentation, theme, index) {
+  const taupe = referenceColor(theme, 'primary', '908269');
+  const pale = referenceColor(theme, 'surface', 'F4F0E8');
+  const points = referencePoints(slide, 3);
+  page.background = { color: referenceColor(theme, 'background', 'FFFFFF') };
+  addEngineeringTopline(page, theme, index);
+
+  referenceLabel(page, 'PROJECT HIGHLIGHTS', 0.84, 0.58, 2.2, taupe, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 0.92, w: 8.2, h: 0.66,
+    fontFace: referenceFont(theme, 'title'), fontSize: 29, bold: true,
+    color: referenceColor(theme, 'title', '212121'),
+  });
+
+  const xs = [0.84, 4.48, 8.12];
+  const imagePrompts = [
+    'primary subject photograph',
+    'detail / materials photograph',
+    'context / environment photograph',
+  ];
+  for (let i = 0; i < 3; i++) {
+    const point = points[i] || referenceDescription(slide, presentation, 'Supporting project point.');
+    const x = xs[i];
+    await addReferenceImageFromPrompt(
+      page,
+      `${referenceTopic(slide, presentation)} ${imagePrompts[i]}, premium editorial Pexels photography, realistic, no text`,
+      { x, y: 1.82, w: 3.20, h: 2.04 },
+      theme,
+      0
+    );
+    referenceText(page, String(i + 1).padStart(2, '0'), {
+      theme, x, y: 4.15, w: 0.52, h: 0.34,
+      fontFace: referenceFont(theme, 'title'), fontSize: 18, bold: true, color: taupe,
+    });
+    referenceText(page, trimText(point, 118), {
+      theme, x: x + 0.68, y: 4.13, w: 2.52, h: 0.86, fontSize: 11.4,
+      color: referenceColor(theme, 'text', '434343'),
+    });
+    addReferenceRule(page, x, 5.40, 3.18, referenceColor(theme, 'secondary', 'CFC3AC'), 0.9);
+    addReferenceRect(page, x, 5.56, 3.18, 0.52, pale, 4);
+  }
+}
+
+async function renderEngineeringStats(page, slide, presentation, theme, index) {
+  const taupe = referenceColor(theme, 'primary', '908269');
+  const points = referencePoints(slide, 3);
+  page.background = { color: referenceColor(theme, 'surface', 'F4F0E8') };
+  addEngineeringTopline(page, theme, index);
+
+  referenceLabel(page, 'AT A GLANCE', 0.84, 0.62, 1.65, taupe, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 0.96, w: 7.0, h: 0.76,
+    fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true,
+    color: referenceColor(theme, 'title', '212121'),
+  });
+
+  const stats = points.length ? points : ['01 — Scope', '02 — Reach', '03 — Result'];
+  for (let i = 0; i < 3; i++) {
+    const x = 0.86 + i * 2.18;
+    referenceText(page, String(i + 1).padStart(2, '0'), {
+      theme, x, y: 2.08, w: 0.48, h: 0.24, fontSize: 9, bold: true, color: taupe,
+    });
+    referenceText(page, trimText(stats[i] || stats[0], 45), {
+      theme, x, y: 2.54, w: 1.74, h: 1.08,
+      fontFace: referenceFont(theme, 'title'), fontSize: 19, bold: true,
+      color: referenceColor(theme, 'title', '212121'),
+    });
+    addReferenceRule(page, x, 3.88, 1.72, referenceColor(theme, 'secondary', 'CFC3AC'), 1.1);
+  }
+
+  await addReferenceImage(page, slide, presentation, { x: 7.70, y: 1.56, w: 4.82, h: 4.92 }, theme, 'project results / evidence photograph', 0);
+  referenceText(page, referenceDescription(slide, presentation, 'A visual summary of the most important signals.'), {
+    theme, x: 0.86, y: 4.72, w: 5.74, h: 0.92, fontSize: 12,
+    color: referenceColor(theme, 'text', '434343'),
+  });
+}
+
+async function renderEngineeringQuote(page, slide, presentation, theme, index) {
+  const taupe = referenceColor(theme, 'primary', '908269');
+  page.background = { color: 'FFFFFF' };
+  await addReferenceImage(page, slide, presentation, { x: 0, y: 0, w: 13.33, h: 7.5 }, theme, 'cinematic editorial background photograph', 0);
+  addReferenceRect(page, 0, 0, 13.33, 7.5, 'FFFFFF', 20);
+  addReferenceRect(page, 0.72, 0.74, 6.28, 5.82, 'FFFFFF', 10);
+
+  referenceLabel(page, 'STATEMENT', 1.02, 1.08, 1.42, taupe, theme);
+  referenceText(page, '“', {
+    theme, x: 0.96, y: 1.48, w: 0.48, h: 0.66,
+    fontFace: referenceFont(theme, 'title'), fontSize: 38, bold: true, color: taupe,
+  });
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 1.06, y: 2.12, w: 5.34, h: 1.74,
+    fontFace: referenceFont(theme, 'title'), fontSize: 28, bold: true,
+    color: referenceColor(theme, 'title', '212121'),
+  });
+  referenceText(page, referenceDescription(slide, presentation, 'A concise statement for the audience.'), {
+    theme, x: 1.06, y: 4.46, w: 5.06, h: 0.82, fontSize: 13,
+    color: referenceColor(theme, 'text', '434343'),
+  });
+  referenceText(page, referenceValue(presentation?.author || presentation?.presenter, 'Nyxora AI'), {
+    theme, x: 1.06, y: 5.72, w: 3.2, h: 0.28, fontSize: 10.5, bold: true, color: taupe,
+  });
+}
+
+async function renderEngineeringFullImage(page, slide, presentation, theme, index) {
+  page.background = { color: '000000' };
+  await addReferenceImage(page, slide, presentation, { x: 0, y: 0, w: 13.33, h: 7.5 }, theme, 'full-frame cinematic editorial photograph', 0);
+  addReferenceRect(page, 0, 4.58, 13.33, 2.92, '111111', 22);
+  referenceLabel(page, `PROJECT / ${String(index + 1).padStart(2, '0')}`, 0.84, 5.04, 2.1, 'FFFFFF', theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 5.34, w: 8.84, h: 0.88,
+    fontFace: referenceFont(theme, 'title'), fontSize: 31, bold: true, color: 'FFFFFF',
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A cinematic visual moment.'), {
+    theme, x: 0.84, y: 6.34, w: 7.0, h: 0.54, fontSize: 13, color: 'FFFFFF', transparency: 4,
+  });
+}
+
+async function renderEngineeringProcess(page, slide, presentation, theme, index) {
+  const taupe = referenceColor(theme, 'primary', '908269');
+  const pale = referenceColor(theme, 'surface', 'F4F0E8');
+  const steps = referenceProcessSteps(slide, 4);
+  page.background = { color: referenceColor(theme, 'background', 'FFFFFF') };
+  addEngineeringTopline(page, theme, index);
+
+  referenceLabel(page, 'PROCESS / TIMELINE', 0.84, 0.62, 2.25, taupe, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 0.98, w: 7.40, h: 0.72,
+    fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true,
+    color: referenceColor(theme, 'title', '212121'),
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A connected sequence explained through the supplied presentation content.'), {
+    theme, x: 0.84, y: 1.76, w: 7.10, h: 0.48, fontSize: 12.6,
+    color: referenceColor(theme, 'mutedText', '595959'),
+  });
+
+  await addReferenceImage(page, slide, presentation, { x: 8.74, y: 0.58, w: 3.82, h: 2.36 }, theme, 'process / workflow project photograph', 0.02);
+
+  const lineY = 3.70;
+  addReferenceRule(page, 1.20, lineY, 10.96, referenceColor(theme, 'secondary', 'CFC3AC'), 1.1);
+
+  for (let i = 0; i < 4; i++) {
+    const step = steps[i] || {
+      title: `Stage ${i + 1}`,
+      body: referenceDescription(slide, presentation, ''),
+      phase: `${String(i + 1).padStart(2, '0')} / PHASE`,
+    };
+    const x = 0.88 + i * 3.10;
+
+    addReferenceCircle(page, x, lineY - 0.31, 0.62, taupe, 0, 'FFFFFF', 100);
+    referenceText(page, String(i + 1).padStart(2, '0'), {
+      theme, x, y: lineY - 0.08, w: 0.62, h: 0.16,
+      fontSize: 8.5, bold: true, align: 'center', color: 'FFFFFF',
+    });
+
+    referenceText(page, step.title, {
+      theme, x, y: 4.18, w: 2.56, h: 0.62,
+      fontFace: referenceFont(theme, 'title'), fontSize: 15, bold: true,
+      color: referenceColor(theme, 'title', '212121'),
+    });
+
+    if (step.body) {
+      referenceText(page, step.body, {
+        theme, x, y: 4.88, w: 2.56, h: 0.82,
+        fontSize: 10.8, color: referenceColor(theme, 'text', '434343'),
+      });
+    }
+
+    referenceLabel(page, step.phase || `${String(i + 1).padStart(2, '0')} / PHASE`, x, 5.90, 2.30, taupe, theme);
+    addReferenceRule(page, x, 6.16, 2.32, pale, 1.15);
+  }
+
+  referenceText(page, referenceDescription(slide, presentation, 'A connected sequence from beginning to outcome.'), {
+    theme, x: 0.88, y: 6.50, w: 7.32, h: 0.42, fontSize: 11.2,
+    color: referenceColor(theme, 'mutedText', '595959'),
+  });
+}
+
+async function renderEngineeringComparison(page, slide, presentation, theme, index) {
+  const taupe = referenceColor(theme, 'primary', '908269');
+  const points = referencePoints(slide, 4);
+  page.background = { color: referenceColor(theme, 'background', 'FFFFFF') };
+  addEngineeringTopline(page, theme, index);
+
+  referenceLabel(page, 'COMPARISON', 0.84, 0.62, 1.50, taupe, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 0.96, w: 7.8, h: 0.72, fontFace: referenceFont(theme, 'title'), fontSize: 29, bold: true,
+    color: referenceColor(theme, 'title', '212121'),
+  });
+
+  await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} before state photograph, documentary Pexels editorial style, no text`, { x: 0.84, y: 1.92, w: 5.82, h: 3.34 }, theme, 0);
+  await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} after state photograph, polished professional Pexels editorial style, no text`, { x: 6.96, y: 1.92, w: 5.56, h: 3.34 }, theme, 0);
+
+  referenceLabel(page, '01 / BEFORE', 0.84, 5.52, 1.55, taupe, theme);
+  referenceText(page, trimText(points[0] || referenceSubtitle(slide, presentation, 'Starting state'), 95), {
+    theme, x: 0.84, y: 5.82, w: 5.64, h: 0.62, fontSize: 11.5, color: referenceColor(theme, 'text', '434343'),
+  });
+  referenceLabel(page, '02 / AFTER', 6.96, 5.52, 1.55, referenceColor(theme, 'tertiary', '976E26'), theme);
+  referenceText(page, trimText(points[1] || referenceDescription(slide, presentation, 'Resulting state'), 95), {
+    theme, x: 6.96, y: 5.82, w: 5.42, h: 0.62, fontSize: 11.5, color: referenceColor(theme, 'text', '434343'),
+  });
+}
+
+async function renderEngineeringClosing(page, slide, presentation, theme, index) {
+  const taupe = referenceColor(theme, 'primary', '908269');
+  page.background = { color: referenceColor(theme, 'surface', 'F4F0E8') };
+  await addReferenceImage(page, slide, presentation, { x: 6.88, y: 0, w: 6.45, h: 7.5 }, theme, 'closing architecture / project photograph', 0);
+  addReferenceRect(page, 0, 0, 7.15, 7.5, 'FFFFFF', 0);
+  referenceLabel(page, 'KEY TAKEAWAY', 0.88, 1.06, 2.04, taupe, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.84, y: 1.58, w: 5.52, h: 1.62,
+    fontFace: referenceFont(theme, 'title'), fontSize: 37, bold: true, color: referenceColor(theme, 'title', '212121'),
+  });
+  addReferenceRule(page, 0.86, 3.72, 1.76, taupe, 1.4);
+  referenceText(page, referenceSubtitle(slide, presentation, 'The closing message in one clear visual statement.'), {
+    theme, x: 0.88, y: 4.04, w: 4.92, h: 0.96, fontSize: 14, color: referenceColor(theme, 'text', '434343'),
+  });
+  referenceText(page, referenceValue(presentation?.author || presentation?.presenter, 'Nyxora AI'), {
+    theme, x: 0.88, y: 6.28, w: 2.9, h: 0.24, fontSize: 10, bold: true, color: taupe,
+  });
+  addReferenceNumber(page, index + 1, 0.88, 6.72, 0.65, 0.26, theme, taupe);
+}
+
+// ======================================================
+// AQUATIC — PREMIUM HEALTHCARE / WELLNESS
+// ======================================================
+
+async function renderAquaticReferenceSlide(page, slide, presentation, theme, layout, index) {
+  switch (layout) {
+    case 'title':
+    case 'cover':
+    case 'hero':
+      return renderAquaticCover(page, slide, presentation, theme, index);
+    case 'section-divider':
+      return renderAquaticSection(page, slide, presentation, theme, index);
+    case 'full-image':
+      return renderAquaticFullImage(page, slide, presentation, theme, index);
+    case 'quote':
+      return renderAquaticQuote(page, slide, presentation, theme, index);
+    case 'stats':
+    case 'metric-grid':
+      return renderAquaticStats(page, slide, presentation, theme, index);
+    case 'imageText':
+    case 'imagetext':
+    case 'two-column':
+      return renderAquaticImageText(page, slide, presentation, theme, index);
+    case 'three-column':
+      return renderAquaticThreeColumn(page, slide, presentation, theme, index);
+    case 'process':
+    case 'timeline':
+    case 'diagram':
+    case 'architecture':
+      return renderAquaticProcess(page, slide, presentation, theme, index);
+    case 'comparison':
+    case 'before-after':
+      return renderAquaticComparison(page, slide, presentation, theme, index);
+    case 'case-study':
+      return renderAquaticImageText(page, slide, presentation, theme, index);
+    case 'testimonial':
+      return renderAquaticQuote(page, slide, presentation, theme, index);
+    case 'key-takeaway':
+    case 'closing':
+    case 'summary':
+    case 'conclusion':
+      return renderAquaticClosing(page, slide, presentation, theme, index);
+    default:
+      return renderAquaticContent(page, slide, presentation, theme, index);
+  }
+}
+
+async function renderAquaticCover(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '285E89');
+  const blue = referenceColor(theme, 'secondary', '9DCEDF');
+  page.background = { color: referenceColor(theme, 'background', 'FFFFFF') };
+
+  await addReferenceImage(page, slide, presentation, { x: 7.00, y: 0.44, w: 5.52, h: 5.96 }, theme, 'wellness / nature / healthcare hero photograph', 0.12);
+  addReferenceCircle(page, 10.82, 0.42, 1.02, blue, 12, 'FFFFFF', 100);
+  addAquaticWaves(page, theme, 'bottom');
+  addAquaticWaves(page, theme, 'top');
+
+  referenceLabel(page, 'HEALTH • WELLNESS • SCIENCE', 0.84, 0.88, 3.2, navy, theme);
+  referenceText(page, String(index + 1).padStart(2, '0'), {
+    theme, x: 0.84, y: 1.34, w: 0.66, h: 0.38, fontFace: referenceFont(theme, 'title'), fontSize: 18, bold: true, color: navy,
+  });
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 1.92, w: 5.62, h: 1.76,
+    fontFace: referenceFont(theme, 'title'), fontSize: 39, bold: true, color: referenceColor(theme, 'title', '1A4568'),
+  });
+  addAquaticWaterline(page, theme, 0.84, 4.06, 4.88);
+  referenceText(page, referenceSubtitle(slide, presentation, 'A clear story supported by evidence and visual context.'), {
+    theme, x: 0.84, y: 4.38, w: 5.32, h: 0.92, fontSize: 14, color: referenceColor(theme, 'text', '1A4568'),
+  });
+  referenceText(page, `${referenceValue(presentation?.organization, 'Nyxora AI')}  •  ${referenceValue(presentation?.date, getCurrentPresentationDate())}`, {
+    theme, x: 0.84, y: 5.70, w: 5.26, h: 0.26, fontSize: 10.5, bold: true, color: referenceColor(theme, 'subtitle', '66A5BB'),
+  });
+}
+
+async function renderAquaticSection(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '285E89');
+  const blue = referenceColor(theme, 'secondary', '9DCEDF');
+  page.background = { color: navy };
+  await addReferenceImage(page, slide, presentation, { x: 7.32, y: 0.78, w: 4.96, h: 4.92 }, theme, 'calm healthcare / aquatic lifestyle photograph', 0.12);
+  addAquaticWaves(page, theme, 'bottom');
+
+  addReferenceCircle(page, 0.86, 0.84, 0.76, blue, 0, 'FFFFFF', 100);
+  referenceText(page, String(index + 1).padStart(2, '0'), {
+    theme, x: 0.86, y: 1.09, w: 0.76, h: 0.22, fontSize: 9.5, bold: true, align: 'center', color: navy,
+  });
+  referenceLabel(page, 'SECTION', 1.82, 1.00, 1.10, blue, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.86, y: 1.86, w: 5.80, h: 1.72,
+    fontFace: referenceFont(theme, 'title'), fontSize: 38, bold: true, color: 'FFFFFF',
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A new chapter in the story.'), {
+    theme, x: 0.88, y: 4.00, w: 5.16, h: 0.86, fontSize: 14.5, color: 'DCEFF5',
+  });
+  referenceLabel(page, `${String(index + 1).padStart(2, '0')} / NYXORA AI`, 0.88, 6.35, 2.10, blue, theme);
+}
+
+async function renderAquaticContent(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '285E89');
+  const points = referencePoints(slide, 5);
+  page.background = { color: referenceColor(theme, 'background', 'FFFFFF') };
+  addAquaticWaves(page, theme, 'top');
+  addAquaticWaves(page, theme, 'bottom');
+
+  referenceLabel(page, 'OVERVIEW', 0.84, 0.66, 1.56, navy, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 0.98, w: 7.06, h: 0.74,
+    fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true, color: referenceColor(theme, 'title', '1A4568'),
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A focused visual explanation.'), {
+    theme, x: 0.84, y: 1.78, w: 6.35, h: 0.52, fontSize: 13.2, color: referenceColor(theme, 'subtitle', '66A5BB'),
+  });
+
+  await addReferenceImage(page, slide, presentation, { x: 8.22, y: 2.08, w: 4.02, h: 3.56 }, theme, 'clean healthcare / science photograph', 0.16);
+  addReferenceRect(page, 7.72, 2.06, 0.14, 3.60, referenceColor(theme, 'secondary', '9DCEDF'), 0);
+  addReferenceCircle(page, 7.48, 2.02, 0.54, referenceColor(theme, 'primary', '285E89'), 0, 'FFFFFF', 100);
+  referenceText(page, String(index + 1).padStart(2, '0'), { theme, x: 7.48, y: 2.20, w: 0.54, h: 0.18, fontSize: 8.5, bold: true, align: 'center', color: 'FFFFFF' });
+
+  points.forEach((point, i) => {
+    const y = 2.55 + i * 0.58;
+    addReferenceCircle(page, 0.88, y, 0.42, referenceColor(theme, 'primary', '285E89'), 0, 'FFFFFF', 100);
+    referenceText(page, String(i + 1).padStart(2, '0'), { theme, x: 0.88, y: y + 0.13, w: 0.42, h: 0.14, fontSize: 7.5, bold: true, align: 'center', color: 'FFFFFF' });
+    referenceText(page, trimText(point, 120), { theme, x: 1.48, y: y + 0.01, w: 5.68, h: 0.40, fontSize: 11.5, color: referenceColor(theme, 'text', '1A4568') });
+  });
+
+  referenceLabel(page, 'VISUAL TAKEAWAY', 8.24, 5.94, 1.88, navy, theme);
+  referenceText(page, referenceDescription(slide, presentation, 'A focused visual summary of the main idea.'), {
+    theme, x: 8.24, y: 6.20, w: 3.96, h: 0.52, fontSize: 10.8, color: referenceColor(theme, 'text', '1A4568'),
+  });
+}
+
+async function renderAquaticImageText(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '285E89');
+  page.background = { color: referenceColor(theme, 'background', 'FFFFFF') };
+  addAquaticWaves(page, theme, 'bottom');
+
+  referenceLabel(page, 'VISUAL STORY', 0.84, 0.70, 1.66, navy, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 1.06, w: 4.72, h: 1.02,
+    fontFace: referenceFont(theme, 'title'), fontSize: 31, bold: true, color: referenceColor(theme, 'title', '1A4568'),
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'Clear explanation paired with strong visual context.'), {
+    theme, x: 0.84, y: 2.32, w: 4.36, h: 1.02, fontSize: 14, color: referenceColor(theme, 'text', '1A4568'),
+  });
+  addAquaticWaterline(page, theme, 0.84, 3.76, 4.20);
+  referenceText(page, referenceDescription(slide, presentation, 'Supporting detail.'), {
+    theme, x: 0.84, y: 4.10, w: 4.36, h: 1.00, fontSize: 11.8, color: referenceColor(theme, 'subtitle', '66A5BB'),
+  });
+
+  await addReferenceImage(page, slide, presentation, { x: 5.42, y: 0.68, w: 6.82, h: 5.84 }, theme, 'large calm healthcare / science editorial photograph', 0.18);
+}
+
+async function renderAquaticThreeColumn(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '285E89');
+  const points = referencePoints(slide, 3);
+  page.background = { color: 'FFFFFF' };
+  addAquaticWaves(page, theme, 'top');
+  addAquaticWaves(page, theme, 'bottom');
+
+  referenceLabel(page, 'KEY AREAS', 0.84, 0.66, 1.40, navy, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 0.98, w: 8.0, h: 0.66, fontFace: referenceFont(theme, 'title'), fontSize: 29, bold: true, color: referenceColor(theme, 'title', '1A4568'),
+  });
+
+  const xs = [0.82, 4.48, 8.14];
+  for (let i = 0; i < 3; i++) {
+    const x = xs[i];
+    await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} ${['primary subject','supporting detail','real-world context'][i]} photograph, healthcare editorial Pexels style, no text`, { x, y: 1.90, w: 3.18, h: 2.12 }, theme, 0.14);
+    addReferenceCircle(page, x + 0.22, 3.72, 0.52, navy, 0, 'FFFFFF', 100);
+    referenceText(page, String(i + 1).padStart(2, '0'), { theme, x: x + 0.22, y: 3.89, w: 0.52, h: 0.15, fontSize: 8, bold: true, align: 'center', color: 'FFFFFF' });
+    referenceText(page, trimText(points[i] || referenceDescription(slide, presentation, 'Supporting point.'), 90), { theme, x: x, y: 4.50, w: 3.02, h: 0.92, fontSize: 11.2, color: referenceColor(theme, 'text', '1A4568') });
+    addAquaticWaterline(page, theme, x, 5.65, 2.68);
+  }
+}
+
+async function renderAquaticStats(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '285E89');
+  const teal = referenceColor(theme, 'secondary', '9DCEDF');
+  const points = referencePoints(slide, 3);
+  page.background = { color: referenceColor(theme, 'surface', 'F8FCFD') };
+  addAquaticWaves(page, theme, 'top');
+
+  referenceLabel(page, 'IN FOCUS', 0.84, 0.62, 1.20, navy, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.82, y: 0.98, w: 7.4, h: 0.72, fontFace: referenceFont(theme, 'title'), fontSize: 29, bold: true, color: navy });
+
+  const stats = points.length ? points : ['Key signal', 'Reach', 'Outcome'];
+  for (let i = 0; i < 3; i++) {
+    const x = 0.84 + i * 2.12;
+    referenceText(page, String(i + 1).padStart(2, '0'), { theme, x, y: 2.02, w: 0.44, h: 0.24, fontSize: 8.5, bold: true, color: teal });
+    referenceText(page, trimText(stats[i] || stats[0], 42), {
+      theme, x, y: 2.52, w: 1.82, h: 1.12, fontFace: referenceFont(theme, 'title'), fontSize: 18, bold: true, color: navy,
+    });
+    addReferenceRule(page, x, 3.94, 1.72, teal, 1.2);
+  }
+
+  await addReferenceImage(page, slide, presentation, { x: 7.56, y: 1.62, w: 4.92, h: 4.70 }, theme, 'wellness outcomes / healthcare evidence photograph', 0.16);
+  referenceText(page, referenceDescription(slide, presentation, 'The visual evidence that supports the metrics.'), { theme, x: 0.84, y: 4.78, w: 5.88, h: 0.72, fontSize: 12, color: referenceColor(theme, 'text', '1A4568') });
+}
+
+async function renderAquaticProcess(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '285E89');
+  const teal = referenceColor(theme, 'secondary', '9DCEDF');
+  const steps = referenceProcessSteps(slide, 4);
+  page.background = { color: referenceColor(theme, 'background', 'FFFFFF') };
+  addAquaticWaves(page, theme, 'top');
+
+  referenceLabel(page, 'PROCESS JOURNEY', 0.84, 0.66, 1.96, navy, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 1.02, w: 7.30, h: 0.72,
+    fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true, color: referenceColor(theme, 'title', '1A4568'),
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'Each step is populated from the AI-generated slide content.'), {
+    theme, x: 0.84, y: 1.78, w: 7.02, h: 0.46, fontSize: 12.4, color: referenceColor(theme, 'subtitle', '66A5BB'),
+  });
+
+  await addReferenceImage(page, slide, presentation, { x: 8.72, y: 0.68, w: 3.60, h: 2.26 }, theme, 'aquatic wellness process photograph', 0.12);
+
+  const lineY = 3.92;
+  addReferenceRule(page, 1.18, lineY, 10.60, teal, 2.4);
+
+  for (let i = 0; i < 4; i++) {
+    const step = steps[i] || {
+      title: `Stage ${i + 1}`,
+      body: referenceDescription(slide, presentation, ''),
+      phase: `${String(i + 1).padStart(2, '0')} / PHASE`,
+    };
+    const x = 0.90 + i * 3.10;
+
+    addReferenceCircle(page, x, lineY - 0.34, 0.68, navy, 0, 'FFFFFF', 100);
+    referenceText(page, String(i + 1).padStart(2, '0'), {
+      theme, x, y: lineY - 0.09, w: 0.68, h: 0.16, fontSize: 8.5, bold: true, align: 'center', color: 'FFFFFF',
+    });
+
+    referenceText(page, step.title, {
+      theme, x: x - 0.02, y: 4.64, w: 2.64, h: 0.62,
+      fontFace: referenceFont(theme, 'title'), fontSize: 14.2, bold: true, color: navy,
+    });
+
+    if (step.body) {
+      referenceText(page, step.body, {
+        theme, x: x - 0.02, y: 5.30, w: 2.64, h: 0.84, fontSize: 10.6, color: referenceColor(theme, 'text', '1A4568'),
+      });
+    }
+
+    referenceLabel(page, step.phase || `${String(i + 1).padStart(2, '0')} / PHASE`, x - 0.02, 6.18, 2.40, referenceColor(theme, 'subtitle', '66A5BB'), theme);
+  }
+
+  addAquaticWaves(page, theme, 'bottom');
+}
+
+async function renderAquaticQuote(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '285E89');
+  page.background = { color: navy };
+  await addReferenceImage(page, slide, presentation, { x: 6.30, y: 0, w: 7.03, h: 7.5 }, theme, 'calm healthcare / nature photograph', 0);
+  addReferenceRect(page, 0, 0, 7.0, 7.5, navy, 0);
+  addReferenceWavesLeft(page, theme);
+
+  referenceLabel(page, 'PERSPECTIVE', 0.92, 0.98, 1.54, referenceColor(theme, 'secondary', '9DCEDF'), theme);
+  referenceText(page, '“', { theme, x: 0.88, y: 1.58, w: 0.52, h: 0.64, fontFace: referenceFont(theme, 'title'), fontSize: 40, bold: true, color: referenceColor(theme, 'secondary', '9DCEDF') });
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.96, y: 2.28, w: 4.95, h: 1.84, fontFace: referenceFont(theme, 'title'), fontSize: 28, bold: true, color: 'FFFFFF' });
+  referenceText(page, referenceDescription(slide, presentation, 'A single idea, given room to breathe.'), { theme, x: 0.98, y: 4.72, w: 4.64, h: 0.82, fontSize: 13, color: 'DCEFF5' });
+  referenceText(page, referenceValue(presentation?.author || presentation?.presenter, 'Nyxora AI'), { theme, x: 0.98, y: 6.02, w: 3.20, h: 0.24, fontSize: 10.5, bold: true, color: referenceColor(theme, 'secondary', '9DCEDF') });
+}
+
+function addReferenceWavesLeft(page, theme) {
+  const blue = referenceColor(theme, 'secondary', '9DCEDF');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="700" height="900" viewBox="0 0 700 900"><path d="M0 170 C120 80 150 310 270 220 S420 60 700 120 L700 0 L0 0 Z" fill="#${blue}" fill-opacity="0.13"/><path d="M0 760 C140 650 240 870 390 770 S540 640 700 700 L700 900 L0 900 Z" fill="#${blue}" fill-opacity="0.10"/></svg>`;
+  page.addImage({ data: svgToDataUri(svg), x: 0, y: 0, w: 5.82, h: 7.5 });
+}
+
+async function renderAquaticFullImage(page, slide, presentation, theme, index) {
+  page.background = { color: '000000' };
+  await addReferenceImage(page, slide, presentation, { x: 0, y: 0, w: 13.33, h: 7.5 }, theme, 'full-frame wellness / healthcare cinematic photograph', 0);
+  addReferenceRect(page, 0, 4.66, 13.33, 2.84, referenceColor(theme, 'primary', '285E89'), 22);
+  addAquaticWaves(page, theme, 'bottom');
+  referenceLabel(page, `${String(index + 1).padStart(2, '0')} / VISUAL`, 0.86, 5.04, 1.54, 'FFFFFF', theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.84, y: 5.34, w: 8.82, h: 0.86, fontFace: referenceFont(theme, 'title'), fontSize: 31, bold: true, color: 'FFFFFF' });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A cinematic moment.'), { theme, x: 0.86, y: 6.36, w: 6.68, h: 0.50, fontSize: 12.8, color: 'E5F6FA' });
+}
+
+async function renderAquaticComparison(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '285E89');
+  const teal = referenceColor(theme, 'secondary', '9DCEDF');
+  const points = referencePoints(slide, 4);
+  page.background = { color: 'FFFFFF' };
+  addAquaticWaves(page, theme, 'top');
+
+  referenceLabel(page, 'COMPARISON', 0.84, 0.64, 1.52, navy, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.82, y: 0.98, w: 7.66, h: 0.68, fontFace: referenceFont(theme, 'title'), fontSize: 29, bold: true, color: navy });
+  await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} first state photograph, clean healthcare Pexels editorial style, no text`, { x: 0.84, y: 1.88, w: 5.80, h: 3.40 }, theme, 0.14);
+  await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} second state photograph, clean healthcare Pexels editorial style, no text`, { x: 6.98, y: 1.88, w: 5.50, h: 3.40 }, theme, 0.14);
+
+  addReferenceCircle(page, 1.10, 5.46, 0.56, navy, 0, 'FFFFFF', 100);
+  referenceText(page, '01', { theme, x: 1.10, y: 5.65, w: 0.56, h: 0.14, fontSize: 8, bold: true, align: 'center', color: 'FFFFFF' });
+  referenceText(page, trimText(points[0] || 'Starting point', 92), { theme, x: 1.84, y: 5.46, w: 4.68, h: 0.50, fontSize: 11.3, color: referenceColor(theme, 'text', '1A4568') });
+  addReferenceCircle(page, 7.22, 5.46, 0.56, teal, 0, 'FFFFFF', 100);
+  referenceText(page, '02', { theme, x: 7.22, y: 5.65, w: 0.56, h: 0.14, fontSize: 8, bold: true, align: 'center', color: navy });
+  referenceText(page, trimText(points[1] || 'Resulting point', 92), { theme, x: 7.96, y: 5.46, w: 4.42, h: 0.50, fontSize: 11.3, color: referenceColor(theme, 'text', '1A4568') });
+}
+
+async function renderAquaticClosing(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '285E89');
+  page.background = { color: navy };
+  await addReferenceImage(page, slide, presentation, { x: 6.58, y: 0.44, w: 6.02, h: 6.42 }, theme, 'calm closing wellness / nature photograph', 0.18);
+  addAquaticWaves(page, theme, 'bottom');
+  addAquaticWaves(page, theme, 'top');
+
+  referenceLabel(page, 'KEY TAKEAWAY', 0.86, 1.04, 1.68, referenceColor(theme, 'secondary', '9DCEDF'), theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.82, y: 1.58, w: 5.30, h: 1.78, fontFace: referenceFont(theme, 'title'), fontSize: 36, bold: true, color: 'FFFFFF' });
+  addAquaticWaterline(page, theme, 0.84, 3.78, 4.42);
+  referenceText(page, referenceSubtitle(slide, presentation, 'A clear final message.'), { theme, x: 0.84, y: 4.18, w: 4.92, h: 0.86, fontSize: 13.5, color: 'DCEFF5' });
+  referenceText(page, referenceValue(presentation?.organization, 'Nyxora AI'), { theme, x: 0.84, y: 6.12, w: 3.0, h: 0.24, fontSize: 10.2, bold: true, color: referenceColor(theme, 'secondary', '9DCEDF') });
+}
+
+// ======================================================
+// BUSINESS — ANNUAL REPORT / CORPORATE DATA EDITORIAL
+// ======================================================
+
+async function renderBusinessReferenceSlide(page, slide, presentation, theme, layout, index) {
+  switch (layout) {
+    case 'title':
+    case 'cover':
+    case 'hero':
+      return renderBusinessCover(page, slide, presentation, theme, index);
+    case 'section-divider':
+      return renderBusinessSection(page, slide, presentation, theme, index);
+    case 'full-image':
+      return renderBusinessFullImage(page, slide, presentation, theme, index);
+    case 'quote':
+      return renderBusinessQuote(page, slide, presentation, theme, index);
+    case 'stats':
+    case 'metric-grid':
+      return renderBusinessStats(page, slide, presentation, theme, index);
+    case 'chart':
+    case 'table':
+      return renderBusinessData(page, slide, presentation, theme, index);
+    case 'timeline':
+    case 'process':
+    case 'diagram':
+    case 'architecture':
+      return renderBusinessProcess(page, slide, presentation, theme, index);
+    case 'three-column':
+      return renderBusinessThreeColumn(page, slide, presentation, theme, index);
+    case 'imageText':
+    case 'imagetext':
+    case 'two-column':
+      return renderBusinessImageText(page, slide, presentation, theme, index);
+    case 'comparison':
+    case 'before-after':
+      return renderBusinessComparison(page, slide, presentation, theme, index);
+    case 'case-study':
+      return renderBusinessImageText(page, slide, presentation, theme, index);
+    case 'testimonial':
+      return renderBusinessQuote(page, slide, presentation, theme, index);
+    case 'key-takeaway':
+    case 'closing':
+    case 'summary':
+    case 'conclusion':
+      return renderBusinessClosing(page, slide, presentation, theme, index);
+    default:
+      return renderBusinessContent(page, slide, presentation, theme, index);
+  }
+}
+
+async function renderBusinessCover(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '00094A');
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  const blue = referenceColor(theme, 'tertiary', '516CEE');
+  page.background = { color: 'FEFEFE' };
+
+  addReferenceRect(page, 7.34, 0, 5.99, 7.5, navy);
+  await addReferenceImage(page, slide, presentation, { x: 7.98, y: 0.66, w: 4.66, h: 4.24 }, theme, 'corporate annual-report hero photograph', 0);
+  addReferenceRect(page, 7.80, 5.24, 4.96, 0.62, cyan, 3);
+  addReferenceRect(page, 12.68, 0, 0.65, 1.66, blue, 0);
+  addBusinessDiagonal(page, theme, 5.84, 4.72, 2.32, 1.84, cyan, 72);
+
+  referenceLabel(page, 'ANNUAL REPORT', 0.84, 0.86, 1.86, blue, theme);
+  referenceText(page, String(index + 1).padStart(2, '0'), { theme, x: 0.84, y: 1.32, w: 0.58, h: 0.26, fontSize: 10.5, bold: true, color: blue });
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 1.74, w: 5.82, h: 1.64,
+    fontFace: referenceFont(theme, 'title'), fontSize: 41, bold: true, color: navy,
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'Performance, progress and perspective.'), {
+    theme, x: 0.84, y: 3.94, w: 4.94, h: 0.76, fontSize: 15, color: blue,
+  });
+  addReferenceRule(page, 0.84, 5.00, 1.72, cyan, 2.2);
+  referenceText(page, `${referenceValue(presentation?.organization, 'Nyxora AI')}  /  ${referenceValue(presentation?.date, getCurrentPresentationDate())}`, {
+    theme, x: 0.84, y: 5.34, w: 5.48, h: 0.28, fontSize: 10.5, bold: true, color: navy,
+  });
+  referenceLabel(page, 'NYXORA AI', 8.02, 6.30, 1.40, 'FFFFFF', theme);
+  referenceText(page, '01', { theme, x: 12.00, y: 6.30, w: 0.46, h: 0.22, fontSize: 9.5, bold: true, align: 'right', color: 'FFFFFF' });
+}
+
+async function renderBusinessSection(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '00094A');
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  page.background = { color: navy };
+  addReferenceRect(page, 0, 0, 1.92, 7.5, cyan, 84);
+  addReferenceRect(page, 11.86, 0, 1.47, 7.5, referenceColor(theme, 'tertiary', '516CEE'), 75);
+  await addReferenceImage(page, slide, presentation, { x: 7.98, y: 1.16, w: 4.32, h: 4.68 }, theme, 'corporate section photography', 0);
+  addBusinessDiagonal(page, theme, 5.92, 0.46, 2.16, 2.26, cyan, 78);
+
+  referenceText(page, String(index + 1).padStart(2, '0'), { theme, x: 0.92, y: 1.04, w: 0.70, h: 0.34, fontSize: 12, bold: true, color: cyan });
+  referenceLabel(page, 'SECTION', 1.84, 1.08, 1.12, cyan, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.92, y: 1.76, w: 6.30, h: 1.70, fontFace: referenceFont(theme, 'title'), fontSize: 39, bold: true, color: 'FFFFFF' });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A clean division point for the report.'), { theme, x: 0.94, y: 4.08, w: 5.55, h: 0.82, fontSize: 14, color: 'D9EBF5' });
+  addReferenceRule(page, 0.94, 5.30, 2.06, cyan, 1.5);
+  referenceLabel(page, 'ANNUAL REPORT / NYXORA', 0.94, 5.58, 2.42, referenceColor(theme, 'tertiary', '516CEE'), theme);
+}
+
+async function renderBusinessContent(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '00094A');
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  const blue = referenceColor(theme, 'tertiary', '516CEE');
+  const points = referencePoints(slide, 5);
+  page.background = { color: 'FEFEFE' };
+  addBusinessGrid(page, theme, index);
+
+  referenceLabel(page, 'SECTION', 0.84, 0.62, 1.16, blue, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.82, y: 0.98, w: 7.42, h: 0.74, fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true, color: navy });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A concise business view of the subject.'), { theme, x: 0.84, y: 1.82, w: 6.62, h: 0.54, fontSize: 13.5, color: blue });
+
+  await addReferenceImage(page, slide, presentation, { x: 8.34, y: 0.78, w: 4.18, h: 2.58 }, theme, 'business / real-world context photograph', 0);
+  await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} detail or close-up, premium corporate Pexels photography, no text`, { x: 7.94, y: 3.70, w: 2.18, h: 2.02 }, theme, 0);
+  await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} environment or people context, premium corporate Pexels photography, no text`, { x: 10.38, y: 3.70, w: 2.14, h: 2.02 }, theme, 0);
+
+  addReferenceRule(page, 0.84, 2.74, 6.48, cyan, 1.5);
+  points.forEach((point, i) => {
+    const y = 3.10 + i * 0.54;
+    referenceText(page, String(i + 1).padStart(2, '0'), { theme, x: 0.86, y, w: 0.46, h: 0.22, fontSize: 9, bold: true, color: blue });
+    referenceText(page, trimText(point, 128), { theme, x: 1.48, y: y - 0.02, w: 5.54, h: 0.38, fontSize: 11.6, color: navy });
+  });
+
+  referenceLabel(page, 'INSIGHT', 8.00, 6.05, 1.02, blue, theme);
+  referenceText(page, referenceDescription(slide, presentation, 'A concise business insight supporting the topic.'), { theme, x: 9.00, y: 5.98, w: 3.52, h: 0.60, fontSize: 10.2, color: navy });
+}
+
+async function renderBusinessImageText(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '00094A');
+  const blue = referenceColor(theme, 'tertiary', '516CEE');
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  page.background = { color: 'FEFEFE' };
+  addBusinessGrid(page, theme, index);
+
+  referenceLabel(page, 'VISUAL STORY', 0.84, 0.62, 1.68, blue, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.82, y: 1.00, w: 5.30, h: 1.16, fontFace: referenceFont(theme, 'title'), fontSize: 31, bold: true, color: navy });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A concise narrative with a strong visual anchor.'), { theme, x: 0.84, y: 2.40, w: 4.94, h: 1.02, fontSize: 14, color: blue });
+  addReferenceRule(page, 0.84, 3.78, 1.84, cyan, 2.0);
+  referenceText(page, referenceDescription(slide, presentation, 'Supporting business context.'), { theme, x: 0.84, y: 4.14, w: 4.62, h: 0.88, fontSize: 11.8, color: navy });
+  referenceLabel(page, `${String(index + 1).padStart(2, '0')} / NYXORA`, 0.84, 6.02, 1.72, blue, theme);
+
+  await addReferenceImage(page, slide, presentation, { x: 5.58, y: 0.62, w: 6.56, h: 5.94 }, theme, 'large corporate editorial photograph', 0);
+}
+
+async function renderBusinessThreeColumn(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '00094A');
+  const blue = referenceColor(theme, 'tertiary', '516CEE');
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  const points = referencePoints(slide, 3);
+  page.background = { color: 'FEFEFE' };
+  addBusinessGrid(page, theme, index);
+
+  referenceLabel(page, 'HIGHLIGHTS', 0.84, 0.64, 1.32, blue, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.82, y: 1.02, w: 8.0, h: 0.68, fontFace: referenceFont(theme, 'title'), fontSize: 29, bold: true, color: navy });
+
+  const xs = [0.82, 4.48, 8.14];
+  for (let i = 0; i < 3; i++) {
+    const x = xs[i];
+    await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} ${['leadership / subject','operations / detail','market / environment'][i]} photograph, premium annual-report Pexels style, no text`, { x, y: 1.92, w: 3.18, h: 2.18 }, theme, 0);
+    referenceText(page, String(i + 1).padStart(2, '0'), { theme, x, y: 4.34, w: 0.52, h: 0.22, fontSize: 9, bold: true, color: blue });
+    referenceText(page, trimText(points[i] || referenceDescription(slide, presentation, 'Supporting point.'), 90), { theme, x: x + 0.64, y: 4.24, w: 2.42, h: 0.90, fontSize: 11.1, color: navy });
+    addReferenceRule(page, x, 5.42, 3.14, cyan, 1.2);
+  }
+}
+
+async function renderBusinessStats(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '00094A');
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  const blue = referenceColor(theme, 'tertiary', '516CEE');
+  const points = referencePoints(slide, 3);
+  page.background = { color: 'FEFEFE' };
+  addBusinessGrid(page, theme, index);
+
+  referenceLabel(page, 'PERFORMANCE', 0.84, 0.64, 1.46, blue, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.82, y: 1.00, w: 8.0, h: 0.68, fontFace: referenceFont(theme, 'title'), fontSize: 29, bold: true, color: navy });
+
+  const stats = points.length ? points : ['Reach', 'Growth', 'Outcome'];
+  for (let i = 0; i < 3; i++) {
+    const x = 0.84 + i * 2.08;
+    referenceText(page, String(i + 1).padStart(2, '0'), { theme, x, y: 2.10, w: 0.44, h: 0.20, fontSize: 8.5, bold: true, color: blue });
+    referenceText(page, trimText(stats[i] || stats[0], 40), { theme, x, y: 2.62, w: 1.70, h: 0.98, fontFace: referenceFont(theme, 'title'), fontSize: 18, bold: true, color: navy });
+    addReferenceRule(page, x, 3.90, 1.70, cyan, 1.7);
+  }
+  await addReferenceImage(page, slide, presentation, { x: 7.62, y: 1.56, w: 4.88, h: 4.72 }, theme, 'business results / executive photography', 0);
+  referenceText(page, referenceDescription(slide, presentation, 'The visual evidence behind the headline metrics.'), { theme, x: 0.84, y: 4.86, w: 5.86, h: 0.70, fontSize: 11.8, color: navy });
+}
+
+async function renderBusinessData(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '00094A');
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  const blue = referenceColor(theme, 'tertiary', '516CEE');
+  const points = referencePoints(slide, 5);
+  page.background = { color: 'FEFEFE' };
+  addBusinessGrid(page, theme, index);
+
+  referenceLabel(page, 'DATA STORY', 0.84, 0.64, 1.44, blue, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.82, y: 1.00, w: 7.88, h: 0.70, fontFace: referenceFont(theme, 'title'), fontSize: 29, bold: true, color: navy });
+
+  await addReferenceImage(page, slide, presentation, { x: 8.02, y: 0.78, w: 4.48, h: 2.62 }, theme, 'business analytics / market photograph', 0);
+
+  referenceText(page, '01', { theme, x: 0.86, y: 2.00, w: 0.54, h: 0.24, fontSize: 9, bold: true, color: blue });
+  referenceText(page, trimText(points[0] || referenceSubtitle(slide, presentation, 'Primary signal'), 54), { theme, x: 1.54, y: 1.94, w: 5.72, h: 0.58, fontFace: referenceFont(theme, 'title'), fontSize: 18, bold: true, color: navy });
+  addReferenceRule(page, 0.86, 2.68, 6.40, cyan, 1.4);
+
+  for (let i = 1; i < Math.min(points.length, 5); i++) {
+    const y = 2.98 + (i - 1) * 0.68;
+    referenceText(page, String(i + 1).padStart(2, '0'), { theme, x: 0.86, y, w: 0.54, h: 0.22, fontSize: 8.5, bold: true, color: blue });
+    referenceText(page, trimText(points[i], 98), { theme, x: 1.54, y: y - 0.02, w: 5.72, h: 0.42, fontSize: 11.2, color: navy });
+    addReferenceRule(page, 0.86, y + 0.56, 6.40, 'D7E6EC', 0.8);
+  }
+
+  referenceLabel(page, 'SOURCE / CONTEXT', 8.04, 3.92, 2.10, blue, theme);
+  referenceText(page, referenceDescription(slide, presentation, 'Supporting context for the data story.'), { theme, x: 8.04, y: 4.26, w: 4.44, h: 1.02, fontSize: 11.2, color: navy });
+}
+
+async function renderBusinessProcess(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '00094A');
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  const blue = referenceColor(theme, 'tertiary', '516CEE');
+  const steps = referenceProcessSteps(slide, 4);
+  page.background = { color: 'FEFEFE' };
+  addBusinessGrid(page, theme, index);
+
+  referenceLabel(page, 'PROCESS / TIMELINE', 0.84, 0.64, 2.18, blue, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.82, y: 1.00, w: 7.80, h: 0.66, fontFace: referenceFont(theme, 'title'), fontSize: 29, bold: true, color: navy,
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A connected sequence built from the AI-generated stages.'), {
+    theme, x: 0.84, y: 1.74, w: 7.10, h: 0.46, fontSize: 12.3, color: referenceColor(theme, 'mutedText', '516CEE'),
+  });
+  await addReferenceImage(page, slide, presentation, { x: 8.30, y: 0.72, w: 4.10, h: 2.40 }, theme, 'corporate workflow / transformation photograph', 0.01);
+
+  const lineY = 3.98;
+  addReferenceRule(page, 1.12, lineY, 10.70, cyan, 1.8);
+
+  for (let i = 0; i < 4; i++) {
+    const step = steps[i] || {
+      title: `Stage ${i + 1}`,
+      body: referenceDescription(slide, presentation, ''),
+      phase: `${String(i + 1).padStart(2, '0')} / PHASE`,
+    };
+    const x = 0.98 + i * 3.12;
+
+    addReferenceRect(page, x, 3.72, 0.66, 0.52, navy);
+    referenceText(page, String(i + 1).padStart(2, '0'), {
+      theme, x, y: 3.88, w: 0.66, h: 0.15, fontSize: 8, bold: true, align: 'center', color: 'FFFFFF',
+    });
+
+    referenceText(page, step.title, {
+      theme, x: x - 0.04, y: 4.52, w: 2.68, h: 0.64, fontFace: referenceFont(theme, 'title'), fontSize: 13.5, bold: true, color: navy,
+    });
+
+    if (step.body) {
+      referenceText(page, step.body, {
+        theme, x: x - 0.04, y: 5.22, w: 2.68, h: 0.80, fontSize: 10.4, color: referenceColor(theme, 'text', '00094A'),
+      });
+    }
+
+    referenceLabel(page, step.phase || `${String(i + 1).padStart(2, '0')} / PHASE`, x - 0.04, 6.10, 2.30, blue, theme);
+    addReferenceRule(page, x - 0.04, 6.38, 2.62, referenceColor(theme, 'border', 'B9DCE8'), 0.9);
+  }
+
+  referenceText(page, referenceDescription(slide, presentation, 'A connected view of the progression.'), {
+    theme, x: 0.90, y: 6.74, w: 6.70, h: 0.32, fontSize: 10.8, color: navy,
+  });
+}
+
+async function renderBusinessQuote(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '00094A');
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  page.background = { color: 'FEFEFE' };
+  await addReferenceImage(page, slide, presentation, { x: 0, y: 0, w: 7.02, h: 7.5 }, theme, 'executive / corporate editorial portrait or context photograph', 0);
+  addReferenceRect(page, 6.44, 0, 6.89, 7.5, navy);
+  addBusinessDiagonal(page, theme, 6.42, 5.08, 2.22, 1.96, cyan, 76);
+
+  referenceLabel(page, 'PERSPECTIVE', 7.24, 1.08, 1.54, cyan, theme);
+  referenceText(page, '“', { theme, x: 7.18, y: 1.56, w: 0.50, h: 0.62, fontFace: referenceFont(theme, 'title'), fontSize: 40, bold: true, color: cyan });
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 7.30, y: 2.22, w: 4.72, h: 1.84, fontFace: referenceFont(theme, 'title'), fontSize: 27, bold: true, color: 'FFFFFF' });
+  referenceText(page, referenceDescription(slide, presentation, 'A focused statement with room for emphasis.'), { theme, x: 7.30, y: 4.66, w: 4.50, h: 0.86, fontSize: 12.6, color: 'D9EBF5' });
+  referenceText(page, referenceValue(presentation?.author || presentation?.presenter, 'Nyxora AI'), { theme, x: 7.30, y: 6.16, w: 3.00, h: 0.24, fontSize: 10.4, bold: true, color: cyan });
+}
+
+async function renderBusinessFullImage(page, slide, presentation, theme, index) {
+  page.background = { color: '000000' };
+  await addReferenceImage(page, slide, presentation, { x: 0, y: 0, w: 13.33, h: 7.5 }, theme, 'full-frame corporate annual-report photograph', 0);
+  addReferenceRect(page, 0, 4.74, 13.33, 2.76, '00094A', 24);
+  referenceLabel(page, `${String(index + 1).padStart(2, '0')} / VISUAL`, 0.86, 5.08, 1.62, '63DBF5', theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.84, y: 5.38, w: 8.76, h: 0.82, fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true, color: 'FFFFFF' });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A cinematic business visual.'), { theme, x: 0.86, y: 6.38, w: 6.60, h: 0.46, fontSize: 12.5, color: 'D9EBF5' });
+}
+
+async function renderBusinessComparison(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '00094A');
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  const blue = referenceColor(theme, 'tertiary', '516CEE');
+  const points = referencePoints(slide, 4);
+  page.background = { color: 'FEFEFE' };
+  addBusinessGrid(page, theme, index);
+
+  referenceLabel(page, 'COMPARISON', 0.84, 0.64, 1.50, blue, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.82, y: 0.98, w: 7.84, h: 0.70, fontFace: referenceFont(theme, 'title'), fontSize: 29, bold: true, color: navy });
+  await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} current / starting state, premium corporate Pexels editorial photography, no text`, { x: 0.84, y: 1.90, w: 5.80, h: 3.42 }, theme, 0);
+  await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} improved / resulting state, premium corporate Pexels editorial photography, no text`, { x: 6.98, y: 1.90, w: 5.52, h: 3.42 }, theme, 0);
+
+  addReferenceRect(page, 0.84, 5.58, 5.80, 0.72, navy);
+  referenceLabel(page, '01 / CURRENT', 1.08, 5.82, 1.32, cyan, theme);
+  referenceText(page, trimText(points[0] || 'Current state', 60), { theme, x: 2.34, y: 5.74, w: 4.04, h: 0.36, fontSize: 10.5, bold: true, color: 'FFFFFF' });
+  addReferenceRect(page, 6.98, 5.58, 5.52, 0.72, blue);
+  referenceLabel(page, '02 / NEXT', 7.22, 5.82, 1.18, 'FFFFFF', theme);
+  referenceText(page, trimText(points[1] || 'Resulting state', 60), { theme, x: 8.36, y: 5.74, w: 3.92, h: 0.36, fontSize: 10.5, bold: true, color: 'FFFFFF' });
+}
+
+async function renderBusinessClosing(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '00094A');
+  const cyan = referenceColor(theme, 'secondary', '63DBF5');
+  const blue = referenceColor(theme, 'tertiary', '516CEE');
+  page.background = { color: 'FEFEFE' };
+  addReferenceRect(page, 0, 0, 6.98, 7.5, navy);
+  await addReferenceImage(page, slide, presentation, { x: 7.18, y: 0.56, w: 5.52, h: 5.84 }, theme, 'closing corporate annual-report photograph', 0);
+  addReferenceRect(page, 7.18, 6.10, 5.52, 0.56, cyan, 2);
+  addBusinessDiagonal(page, theme, 5.74, 0.40, 1.98, 2.12, cyan, 76);
+
+  referenceLabel(page, 'KEY TAKEAWAY', 0.92, 1.06, 1.72, cyan, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.86, y: 1.62, w: 5.20, h: 1.74, fontFace: referenceFont(theme, 'title'), fontSize: 37, bold: true, color: 'FFFFFF' });
+  addReferenceRule(page, 0.90, 3.88, 1.82, cyan, 2.0);
+  referenceText(page, referenceSubtitle(slide, presentation, 'The closing message in one clear visual statement.'), { theme, x: 0.90, y: 4.24, w: 4.92, h: 0.96, fontSize: 13.5, color: 'D9EBF5' });
+  referenceLabel(page, `${String(index + 1).padStart(2, '0')} / NYXORA AI`, 0.90, 6.22, 2.10, blue, theme);
+  referenceText(page, referenceValue(presentation?.organization, 'Nyxora AI'), { theme, x: 7.40, y: 6.22, w: 3.60, h: 0.22, fontSize: 10, bold: true, color: navy });
+}
+
+// ======================================================
+// MODERN CLASSROOM — PREMIUM EDUCATIONAL EDITORIAL
+// ======================================================
+
+async function renderModernClassroomReferenceSlide(page, slide, presentation, theme, layout, index) {
+  switch (layout) {
+    case 'title':
+    case 'cover':
+    case 'hero':
+      return renderModernClassroomCover(page, slide, presentation, theme, index);
+    case 'section-divider':
+      return renderModernClassroomSection(page, slide, presentation, theme, index);
+    case 'full-image':
+      return renderModernClassroomFullImage(page, slide, presentation, theme, index);
+    case 'quote':
+    case 'testimonial':
+      return renderModernClassroomQuote(page, slide, presentation, theme, index);
+    case 'stats':
+    case 'metric-grid':
+      return renderModernClassroomStats(page, slide, presentation, theme, index);
+    case 'process':
+    case 'timeline':
+    case 'diagram':
+    case 'architecture':
+      return renderModernClassroomProcess(page, slide, presentation, theme, index);
+    case 'comparison':
+    case 'before-after':
+      return renderModernClassroomComparison(page, slide, presentation, theme, index);
+    case 'imageText':
+    case 'imagetext':
+    case 'two-column':
+    case 'three-column':
+    case 'case-study':
+      return renderModernClassroomImageStory(page, slide, presentation, theme, index);
+    case 'key-takeaway':
+    case 'closing':
+    case 'summary':
+    case 'conclusion':
+      return renderModernClassroomClosing(page, slide, presentation, theme, index);
+    default:
+      return renderModernClassroomContent(page, slide, presentation, theme, index);
+  }
+}
+
+function addModernClassroomFrame(page, theme, index, dark = false) {
+  const navy = referenceColor(theme, 'primary', '0B4F6C');
+  const teal = referenceColor(theme, 'secondary', '20B2AA');
+  const gold = referenceColor(theme, 'tertiary', 'D89B2B');
+  if (!dark) {
+    addReferenceRect(page, 0, 0, 0.12, 7.5, navy);
+    addReferenceRect(page, 0.12, 0, 0.05, 7.5, teal);
+    addReferenceRect(page, 0, 0, 2.30, 0.08, navy);
+    addReferenceRect(page, 2.30, 0, 1.10, 0.08, teal);
+    addReferenceRect(page, 3.40, 0, 0.62, 0.08, gold);
+  } else {
+    addReferenceRect(page, 0, 0, 13.33, 0.09, teal);
+    addReferenceRect(page, 0, 7.41, 13.33, 0.09, navy);
+  }
+
+  referenceLabel(
+    page,
+    `${String(index + 1).padStart(2, '0')} / NYXORA CLASSROOM`,
+    10.18,
+    0.28,
+    2.28,
+    dark ? teal : navy,
+    theme
+  );
+}
+
+async function renderModernClassroomCover(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '0B4F6C');
+  const teal = referenceColor(theme, 'secondary', '20B2AA');
+  const gold = referenceColor(theme, 'tertiary', 'D89B2B');
+  page.background = { color: referenceColor(theme, 'background', 'F7F8FA') };
+
+  addReferenceRect(page, 0, 0, 4.52, 7.5, navy);
+  addReferenceRect(page, 4.52, 0, 8.81, 7.5, referenceColor(theme, 'surface', 'F0F4F8'));
+  addReferenceRect(page, 0, 0, 0.10, 7.5, teal);
+  addReferenceRect(page, 4.10, 5.98, 0.42, 0.82, gold);
+  addReferenceRect(page, 4.34, 5.76, 0.58, 0.22, teal);
+
+  await addReferenceImage(page, slide, presentation, { x: 6.00, y: 0.58, w: 6.42, h: 6.34 }, theme, 'modern classroom / learning / student study hero photograph', 0.06);
+
+  referenceLabel(page, 'MODERN CLASSROOM', 0.78, 0.82, 2.30, teal, theme);
+  referenceText(page, String(index + 1).padStart(2, '0'), {
+    theme, x: 0.78, y: 1.34, w: 0.84, h: 0.54, fontFace: referenceFont(theme, 'title'), fontSize: 25, bold: true, color: 'FFFFFF',
+  });
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.78, y: 2.04, w: 3.20, h: 1.88,
+    fontFace: referenceFont(theme, 'title'), fontSize: 38, bold: true, color: 'FFFFFF',
+  });
+  addReferenceRule(page, 0.80, 4.28, 1.58, gold, 2.2);
+  referenceText(page, referenceSubtitle(slide, presentation, 'A polished lesson story built for clear learning.'), {
+    theme, x: 0.80, y: 4.62, w: 2.96, h: 1.00, fontSize: 13.4, color: 'E7F3F5',
+  });
+  referenceLabel(page, 'PRESENTED BY', 0.80, 6.28, 1.28, teal, theme);
+  referenceText(page, referenceValue(presentation?.presenter || presentation?.author, 'Nyxora AI'), {
+    theme, x: 0.80, y: 6.54, w: 2.70, h: 0.28, fontSize: 11.2, bold: true, color: 'FFFFFF',
+  });
+  referenceText(page, referenceValue(presentation?.date, getCurrentPresentationDate()), {
+    theme, x: 3.04, y: 6.54, w: 1.00, h: 0.28, fontSize: 9.6, bold: true, align: 'right', color: 'C7E7EC',
+  });
+}
+
+async function renderModernClassroomSection(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '0B4F6C');
+  const teal = referenceColor(theme, 'secondary', '20B2AA');
+  page.background = { color: referenceColor(theme, 'surface', 'F0F4F8') };
+  addModernClassroomFrame(page, theme, index);
+
+  await addReferenceImage(page, slide, presentation, { x: 7.92, y: 0.84, w: 4.54, h: 5.92 }, theme, 'classroom / science learning editorial photograph', 0.04);
+
+  referenceLabel(page, 'LESSON SECTION', 0.78, 0.86, 1.70, teal, theme);
+  referenceText(page, String(index + 1).padStart(2, '0'), {
+    theme, x: 0.78, y: 1.48, w: 1.00, h: 0.58, fontFace: referenceFont(theme, 'title'), fontSize: 26, bold: true, color: navy,
+  });
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.80, y: 2.12, w: 5.72, h: 1.86,
+    fontFace: referenceFont(theme, 'title'), fontSize: 36, bold: true, color: referenceColor(theme, 'title', '0C2340'),
+  });
+  addReferenceRule(page, 0.82, 4.24, 1.52, teal, 1.8);
+  referenceText(page, referenceSubtitle(slide, presentation, 'A focused chapter in the lesson.'), {
+    theme, x: 0.82, y: 4.56, w: 5.52, h: 0.96, fontSize: 13.5, color: referenceColor(theme, 'subtitle', '5B6B7A'),
+  });
+  referenceLabel(page, 'CORE IDEA', 0.82, 6.14, 1.18, navy, theme);
+  referenceText(page, referenceDescription(slide, presentation, 'Use the slide narrative to reinforce the core idea.'), {
+    theme, x: 2.12, y: 6.06, w: 4.72, h: 0.60, fontSize: 10.8, color: referenceColor(theme, 'text', '16263A'),
+  });
+}
+
+async function renderModernClassroomContent(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '0B4F6C');
+  const teal = referenceColor(theme, 'secondary', '20B2AA');
+  const gold = referenceColor(theme, 'tertiary', 'D89B2B');
+  const points = referencePoints(slide, 5);
+  page.background = { color: referenceColor(theme, 'background', 'F7F8FA') };
+  addModernClassroomFrame(page, theme, index);
+
+  referenceLabel(page, 'LESSON NOTE', 0.76, 0.58, 1.34, navy, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 0.76, y: 0.90, w: 7.34, h: 0.76,
+    fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true, color: referenceColor(theme, 'title', '0C2340'),
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'Core concepts and evidence from the generated lesson.'), {
+    theme, x: 0.78, y: 1.70, w: 6.98, h: 0.48, fontSize: 12.4, color: referenceColor(theme, 'subtitle', '5B6B7A'),
+  });
+
+  await addReferenceImage(page, slide, presentation, { x: 8.86, y: 0.76, w: 3.66, h: 2.52 }, theme, 'student learning / classroom context editorial photograph', 0.05);
+  addReferenceRect(page, 8.54, 0.76, 0.06, 2.52, teal);
+  referenceLabel(page, 'VISUAL CONTEXT', 8.88, 3.58, 1.64, navy, theme);
+  referenceText(page, referenceDescription(slide, presentation, 'Visual context supporting the lesson.'), {
+    theme, x: 8.88, y: 3.88, w: 3.46, h: 0.72, fontSize: 10.8, color: referenceColor(theme, 'text', '16263A'),
+  });
+
+  const count = Math.min(points.length, 5);
+  const topY = 2.52;
+  const rowGap = count >= 5 ? 0.76 : 0.86;
+
+  for (let i = 0; i < count; i++) {
+    const y = topY + i * rowGap;
+    addReferenceRect(page, 0.78, y, 0.06, 0.56, i % 2 === 0 ? navy : teal);
+    referenceText(page, String(i + 1).padStart(2, '0'), {
+      theme, x: 0.98, y: y + 0.02, w: 0.48, h: 0.26, fontSize: 9.2, bold: true, color: gold,
+    });
+    referenceText(page, points[i], {
+      theme, x: 1.58, y: y - 0.02, w: 6.56, h: 0.62, fontSize: 11.5, color: referenceColor(theme, 'text', '16263A'),
+    });
+    addReferenceRule(page, 1.58, y + 0.62, 6.28, referenceColor(theme, 'border', 'D6DEE6'), 0.8);
+  }
+
+  if (count === 0) {
+    referenceText(page, referenceDescription(slide, presentation, 'Add the key concept or explanation here.'), {
+      theme, x: 1.58, y: 2.66, w: 6.28, h: 1.12, fontSize: 12.2, color: referenceColor(theme, 'text', '16263A'),
+    });
+  }
+}
+
+async function renderModernClassroomImageStory(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '0B4F6C');
+  const teal = referenceColor(theme, 'secondary', '20B2AA');
+  page.background = { color: referenceColor(theme, 'background', 'F7F8FA') };
+  addModernClassroomFrame(page, theme, index);
+
+  await addReferenceImage(page, slide, presentation, { x: 0.76, y: 0.84, w: 6.08, h: 5.86 }, theme, 'education / classroom subject editorial photograph', 0.04);
+
+  referenceLabel(page, 'VISUAL STORY', 7.44, 0.82, 1.50, navy, theme);
+  referenceText(page, referenceTitle(slide, presentation), {
+    theme, x: 7.42, y: 1.18, w: 4.82, h: 1.30, fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true, color: referenceColor(theme, 'title', '0C2340'),
+  });
+  referenceText(page, referenceSubtitle(slide, presentation, 'Explanation paired with visual context.'), {
+    theme, x: 7.44, y: 2.64, w: 4.60, h: 0.82, fontSize: 13.0, color: referenceColor(theme, 'subtitle', '5B6B7A'),
+  });
+
+  const points = referencePoints(slide, 3);
+  const ys = [3.72, 4.64, 5.56];
+  points.forEach((point, i) => {
+    addReferenceCircle(page, 7.46, ys[i], 0.42, i === 1 ? teal : navy);
+    referenceText(page, String(i + 1).padStart(2, '0'), { theme, x: 7.46, y: ys[i] + 0.13, w: 0.42, h: 0.14, fontSize: 7.5, bold: true, align: 'center', color: 'FFFFFF' });
+    referenceText(page, point, { theme, x: 8.08, y: ys[i] - 0.02, w: 4.18, h: 0.54, fontSize: 10.7, color: referenceColor(theme, 'text', '16263A') });
+  });
+  referenceLabel(page, 'TEACHER NOTE', 7.46, 6.52, 1.46, teal, theme);
+}
+
+async function renderModernClassroomProcess(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '0B4F6C');
+  const teal = referenceColor(theme, 'secondary', '20B2AA');
+  const gold = referenceColor(theme, 'tertiary', 'D89B2B');
+  const steps = referenceProcessSteps(slide, 4);
+  page.background = { color: referenceColor(theme, 'surface', 'F0F4F8') };
+  addModernClassroomFrame(page, theme, index);
+
+  referenceLabel(page, 'LEARNING PATH', 0.76, 0.58, 1.44, navy, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.76, y: 0.90, w: 7.40, h: 0.76, fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true, color: referenceColor(theme, 'title', '0C2340') });
+  referenceText(page, referenceSubtitle(slide, presentation, 'The generated stages are shown directly in the sequence.'), { theme, x: 0.78, y: 1.70, w: 7.24, h: 0.44, fontSize: 12.3, color: referenceColor(theme, 'subtitle', '5B6B7A') });
+
+  await addReferenceImage(page, slide, presentation, { x: 9.02, y: 0.72, w: 3.42, h: 2.18 }, theme, 'learning process / classroom activity photograph', 0.04);
+
+  const lineY = 3.62;
+  addReferenceRule(page, 1.12, lineY, 10.56, teal, 2.4);
+
+  for (let i = 0; i < 4; i++) {
+    const step = steps[i] || { title: `Stage ${i + 1}`, body: referenceDescription(slide, presentation, ''), phase: `${String(i + 1).padStart(2, '0')} / PHASE` };
+    const x = 0.92 + i * 3.08;
+    const marker = i % 2 === 0 ? navy : teal;
+    addReferenceCircle(page, x, lineY - 0.32, 0.64, marker);
+    referenceText(page, String(i + 1).padStart(2, '0'), { theme, x, y: lineY - 0.08, w: 0.64, h: 0.16, fontSize: 8.2, bold: true, align: 'center', color: 'FFFFFF' });
+    referenceText(page, step.title, { theme, x: x - 0.02, y: 4.28, w: 2.58, h: 0.58, fontFace: referenceFont(theme, 'title'), fontSize: 14, bold: true, color: navy });
+    if (step.body) {
+      referenceText(page, step.body, { theme, x: x - 0.02, y: 4.94, w: 2.58, h: 0.88, fontSize: 10.3, color: referenceColor(theme, 'text', '16263A') });
+    }
+    referenceLabel(page, step.phase || `${String(i + 1).padStart(2, '0')} / PHASE`, x - 0.02, 5.98, 2.26, gold, theme);
+  }
+
+  addReferenceRect(page, 0.78, 6.56, 0.05, 0.46, teal);
+  referenceText(page, referenceDescription(slide, presentation, 'A connected progression from the first idea to the final outcome.'), { theme, x: 1.02, y: 6.50, w: 7.30, h: 0.54, fontSize: 10.6, color: referenceColor(theme, 'subtitle', '5B6B7A') });
+}
+
+async function renderModernClassroomStats(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '0B4F6C');
+  const teal = referenceColor(theme, 'secondary', '20B2AA');
+  const gold = referenceColor(theme, 'tertiary', 'D89B2B');
+  const points = referencePoints(slide, 3);
+  page.background = { color: referenceColor(theme, 'background', 'F7F8FA') };
+  addModernClassroomFrame(page, theme, index);
+
+  referenceLabel(page, 'LEARNING SIGNALS', 0.76, 0.58, 1.76, navy, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.76, y: 0.90, w: 7.2, h: 0.72, fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true, color: referenceColor(theme, 'title', '0C2340') });
+
+  await addReferenceImage(page, slide, presentation, { x: 9.12, y: 0.72, w: 3.18, h: 2.18 }, theme, 'students learning / education results editorial photograph', 0.04);
+
+  for (let i = 0; i < 3; i++) {
+    const x = 0.80 + i * 2.44;
+    const value = points[i] || ['Concept', 'Evidence', 'Outcome'][i];
+    referenceText(page, String(i + 1).padStart(2, '0'), { theme, x, y: 2.34, w: 0.50, h: 0.26, fontSize: 9.2, bold: true, color: gold });
+    referenceText(page, value, { theme, x, y: 2.82, w: 2.02, h: 1.36, fontFace: referenceFont(theme, 'title'), fontSize: 19, bold: true, color: navy });
+    addReferenceRule(page, x, 4.34, 2.06, i === 1 ? teal : navy, 1.6);
+  }
+
+  referenceLabel(page, 'INTERPRETATION', 0.82, 5.14, 1.54, teal, theme);
+  referenceText(page, referenceDescription(slide, presentation, 'Use the narrative to explain why these learning signals matter.'), { theme, x: 0.82, y: 5.46, w: 7.24, h: 0.94, fontSize: 11.8, color: referenceColor(theme, 'text', '16263A') });
+}
+
+async function renderModernClassroomComparison(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '0B4F6C');
+  const teal = referenceColor(theme, 'secondary', '20B2AA');
+  page.background = { color: referenceColor(theme, 'background', 'F7F8FA') };
+  addModernClassroomFrame(page, theme, index);
+
+  referenceLabel(page, 'COMPARE', 0.76, 0.58, 0.96, navy, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.76, y: 0.90, w: 8.10, h: 0.74, fontFace: referenceFont(theme, 'title'), fontSize: 30, bold: true, color: referenceColor(theme, 'title', '0C2340') });
+
+  await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} first concept / classroom context, premium education editorial Pexels photography, no text`, { x: 0.80, y: 1.82, w: 5.76, h: 3.26 }, theme, 0.04);
+  await addReferenceImageFromPrompt(page, `${referenceTopic(slide, presentation)} second concept / classroom context, premium education editorial Pexels photography, no text`, { x: 6.76, y: 1.82, w: 5.76, h: 3.26 }, theme, 0.04);
+
+  const points = referencePoints(slide, 2);
+  addReferenceRect(page, 0.80, 5.34, 5.76, 0.92, navy);
+  addReferenceRect(page, 6.76, 5.34, 5.76, 0.92, teal);
+  referenceLabel(page, '01 /', 1.02, 5.52, 0.70, 'FFFFFF', theme);
+  referenceText(page, points[0] || 'First concept', { theme, x: 1.76, y: 5.47, w: 4.46, h: 0.46, fontSize: 10.6, bold: true, color: 'FFFFFF' });
+  referenceLabel(page, '02 /', 6.98, 5.52, 0.70, 'FFFFFF', theme);
+  referenceText(page, points[1] || 'Second concept', { theme, x: 7.72, y: 5.47, w: 4.48, h: 0.46, fontSize: 10.6, bold: true, color: 'FFFFFF' });
+  referenceText(page, referenceDescription(slide, presentation, 'A concise learning contrast.'), { theme, x: 0.82, y: 6.58, w: 7.50, h: 0.42, fontSize: 10.8, color: referenceColor(theme, 'subtitle', '5B6B7A') });
+}
+
+async function renderModernClassroomQuote(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '0B4F6C');
+  const teal = referenceColor(theme, 'secondary', '20B2AA');
+  page.background = { color: navy };
+  addModernClassroomFrame(page, theme, index, true);
+  await addReferenceImage(page, slide, presentation, { x: 7.02, y: 0, w: 6.31, h: 7.5 }, theme, 'teacher / student portrait or learning environment editorial photograph', 0);
+  addReferenceRect(page, 0, 0, 7.38, 7.5, navy);
+  referenceLabel(page, 'TEACHER NOTE', 0.82, 0.92, 1.46, teal, theme);
+  referenceText(page, '“', { theme, x: 0.80, y: 1.48, w: 0.56, h: 0.68, fontFace: referenceFont(theme, 'title'), fontSize: 44, bold: true, color: teal });
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.88, y: 2.16, w: 5.52, h: 1.88, fontFace: referenceFont(theme, 'title'), fontSize: 28, bold: true, color: 'FFFFFF' });
+  referenceText(page, referenceDescription(slide, presentation, 'A focused message for the learner.'), { theme, x: 0.90, y: 4.60, w: 5.28, h: 1.00, fontSize: 13.0, color: 'E4F3F5' });
+  referenceLabel(page, referenceValue(presentation?.author || presentation?.presenter, 'NYXORA AI'), 0.90, 6.34, 2.60, teal, theme);
+}
+
+async function renderModernClassroomFullImage(page, slide, presentation, theme, index) {
+  page.background = { color: '000000' };
+  await addReferenceImage(page, slide, presentation, { x: 0, y: 0, w: 13.33, h: 7.5 }, theme, 'full-frame premium classroom / learning cinematic photograph', 0);
+  addReferenceRect(page, 0, 4.76, 13.33, 2.74, referenceColor(theme, 'primary', '0B4F6C'), 28);
+  referenceLabel(page, `${String(index + 1).padStart(2, '0')} / CLASSROOM`, 0.86, 5.10, 1.72, referenceColor(theme, 'secondary', '20B2AA'), theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.84, y: 5.40, w: 8.84, h: 0.86, fontFace: referenceFont(theme, 'title'), fontSize: 31, bold: true, color: 'FFFFFF' });
+  referenceText(page, referenceSubtitle(slide, presentation, 'A cinematic learning moment.'), { theme, x: 0.86, y: 6.40, w: 7.12, h: 0.46, fontSize: 12.4, color: 'E2F2F4' });
+}
+
+async function renderModernClassroomClosing(page, slide, presentation, theme, index) {
+  const navy = referenceColor(theme, 'primary', '0B4F6C');
+  const teal = referenceColor(theme, 'secondary', '20B2AA');
+  const gold = referenceColor(theme, 'tertiary', 'D89B2B');
+  page.background = { color: navy };
+  addReferenceRect(page, 0, 0, 5.48, 7.5, navy);
+  await addReferenceImage(page, slide, presentation, { x: 5.36, y: 0.56, w: 7.12, h: 6.36 }, theme, 'students / graduation / learning success closing photograph', 0.04);
+  addReferenceRect(page, 5.36, 6.38, 7.12, 0.54, teal, 8);
+  referenceLabel(page, 'KEY TAKEAWAY', 0.80, 0.94, 1.68, gold, theme);
+  referenceText(page, referenceTitle(slide, presentation), { theme, x: 0.80, y: 1.56, w: 4.02, h: 1.80, fontFace: referenceFont(theme, 'title'), fontSize: 36, bold: true, color: 'FFFFFF' });
+  addReferenceRule(page, 0.82, 3.84, 1.60, teal, 2.2);
+  referenceText(page, referenceSubtitle(slide, presentation, 'The most important lesson to remember.'), { theme, x: 0.82, y: 4.22, w: 4.18, h: 1.08, fontSize: 13.4, color: 'E2F2F4' });
+  referenceLabel(page, `${String(index + 1).padStart(2, '0')} / NYXORA AI`, 0.82, 6.40, 1.94, teal, theme);
+}
+
+// ======================================================
+// END PREMIUM REFERENCE TEMPLATE ENGINE
+// ======================================================
+
 function addSlideNumber(
 
   page,
@@ -7762,6 +10095,39 @@ function addSlideNumber(
 
 ) {
 
+  const referenceTemplate =
+    theme?.templateId &&
+    theme.templateId !== "nyxoraOriginal";
+
+  if (referenceTemplate) {
+    const templateId =
+      String(theme.templateId).toLowerCase();
+
+    const color =
+      templateId === "businessannualreport"
+        ? cleanColor(theme.colors.secondary || "63DBF5")
+        : templateId === "aquatic"
+          ? cleanColor(theme.colors.primary || "285E89")
+          : cleanColor(theme.colors.primary || "908269");
+
+    page.addText(
+      String(index + 1).padStart(2, "0"),
+      {
+        x: 12.08,
+        y: 6.94,
+        w: 0.55,
+        h: 0.18,
+        fontFace: theme?.typography?.body || "Segoe UI",
+        fontSize: 8.5,
+        bold: true,
+        align: "right",
+        color,
+        margin: 0,
+      }
+    );
+
+    return;
+  }
 
   page.addShape(
 
@@ -7857,6 +10223,7 @@ function addSlideNumber(
     }
 
   );
+
 
 }
 

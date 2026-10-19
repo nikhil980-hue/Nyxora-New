@@ -27,7 +27,9 @@ const API_KEYS = [
 ].filter(Boolean);
 
 if (API_KEYS.length === 0) {
-  throw new Error("No Gemini API keys found.");
+  console.warn(
+    "[Nyxora Memory] No Gemini API keys configured. Memory extraction will be skipped."
+  );
 }
 
 function getAIClient(apiKey) {
@@ -1708,10 +1710,16 @@ ${message}
 // MAIN MEMORY EXTRACTOR
 // ======================================================
 
+
 export async function extractMemory(
   message,
   existingMemory = null
+
 ) {
+
+  if (API_KEYS.length === 0) {
+  return {};
+}
 
   if (
     !message ||

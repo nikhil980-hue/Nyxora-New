@@ -20,34 +20,45 @@ import {
 
 
 // ======================================================
+// CHAT SCOPES
+// ======================================================
+
+export const CHAT_SCOPE = "chat";
+export const IMAGE_STUDIO_SCOPE = "imageStudio";
+
+function getCollectionName(
+  scope = CHAT_SCOPE
+) {
+
+  return scope === IMAGE_STUDIO_SCOPE
+    ? "imageStudioChats"
+    : "chats";
+
+}
+
+
+// ======================================================
 // CHATS COLLECTION
 // ======================================================
 
-function chatsCollection() {
+function chatsCollection(
+  scope = CHAT_SCOPE
+) {
 
   const uid =
     auth.currentUser?.uid;
 
-
   if (!uid) {
-
     throw new Error(
       "User not authenticated"
     );
-
   }
 
-
   return collection(
-
     db,
-
     "users",
-
     uid,
-
-    "chats"
-
+    getCollectionName(scope)
   );
 
 }
@@ -58,34 +69,25 @@ function chatsCollection() {
 // ======================================================
 
 function chatDocRef(
-  chatId
+  chatId,
+  scope = CHAT_SCOPE
 ) {
 
   const uid =
     auth.currentUser?.uid;
 
-
   if (!uid) {
-
     throw new Error(
       "User not authenticated"
     );
-
   }
 
-
   return doc(
-
     db,
-
     "users",
-
     uid,
-
-    "chats",
-
+    getCollectionName(scope),
     chatId
-
   );
 
 }
@@ -96,38 +98,27 @@ function chatDocRef(
 // ======================================================
 
 function messagesRef(
-  chatId
+  chatId,
+  scope = CHAT_SCOPE
 ) {
 
   const uid =
     auth.currentUser?.uid;
 
-
   if (!uid) {
-
     throw new Error(
       "User not authenticated"
     );
-
   }
 
-
   return doc(
-
     db,
-
     "users",
-
     uid,
-
-    "chats",
-
+    getCollectionName(scope),
     chatId,
-
     "data",
-
     "messages"
-
   );
 
 }
@@ -138,28 +129,21 @@ function messagesRef(
 // ======================================================
 
 export async function createChat(
-  title = "New Chat"
+  title = "New Chat",
+  scope = CHAT_SCOPE
 ) {
 
   const ref =
     await addDoc(
-
-      chatsCollection(),
-
+      chatsCollection(scope),
       {
-
         title,
-
         createdAt:
           serverTimestamp(),
-
         updatedAt:
           serverTimestamp(),
-
       }
-
     );
-
 
   return ref.id;
 
@@ -170,27 +154,23 @@ export async function createChat(
 // GET CHATS
 // ======================================================
 
-export async function getChats() {
+export async function getChats(
+  scope = CHAT_SCOPE
+) {
 
   const q =
     query(
-
-      chatsCollection(),
-
+      chatsCollection(scope),
       orderBy(
         "updatedAt",
         "desc"
       )
-
     );
-
 
   const snapshot =
     await getDocs(q);
 
-
   const chats = [];
-
 
   for (
     const chatDocument of
@@ -200,19 +180,15 @@ export async function getChats() {
     const data =
       chatDocument.data();
 
-
     const messagesSnapshot =
       await getDoc(
-
         messagesRef(
-          chatDocument.id
+          chatDocument.id,
+          scope
         )
-
       );
 
-
     chats.push({
-
       id:
         chatDocument.id,
 
@@ -221,22 +197,17 @@ export async function getChats() {
         "New Chat",
 
       messages:
-
         messagesSnapshot.exists()
-
           ? (
               messagesSnapshot
                 .data()
                 .messages ||
               []
             )
-
           : [],
-
     });
 
   }
-
 
   return chats;
 
@@ -248,36 +219,28 @@ export async function getChats() {
 // ======================================================
 
 export function subscribeToChats(
-  callback
+  callback,
+  scope = CHAT_SCOPE
 ) {
 
   const q =
     query(
-
-      chatsCollection(),
-
+      chatsCollection(scope),
       orderBy(
         "updatedAt",
         "desc"
       )
-
     );
 
-
   return onSnapshot(
-
     q,
-
     (snapshot) => {
 
       const chats =
-
         snapshot.docs.map(
-
           (
             chatDocument
           ) => ({
-
             id:
               chatDocument.id,
 
@@ -288,37 +251,29 @@ export function subscribeToChats(
               "New Chat",
 
             messages: [],
-
           })
-
         );
-
 
       console.log(
         "Realtime chats received:",
-        chats
+        chats,
+        "scope:",
+        scope
       );
-
 
       callback(
         chats
       );
 
     },
-
-
     (error) => {
 
       console.error(
-
         "Chat realtime error:",
-
         error
-
       );
 
     }
-
   );
 
 }
@@ -330,55 +285,43 @@ export function subscribeToChats(
 
 export function subscribeToMessages(
   chatId,
-  callback
+  callback,
+  scope = CHAT_SCOPE
 ) {
 
   console.log(
-
     "Listening messages:",
-
-    chatId
-
+    chatId,
+    "scope:",
+    scope
   );
 
-
   return onSnapshot(
-
     messagesRef(
-      chatId
+      chatId,
+      scope
     ),
-
     (snapshot) => {
 
       console.log(
-
         "Realtime message snapshot:",
-
         snapshot.exists()
-
       );
-
 
       if (
         snapshot.exists()
       ) {
 
         const messages =
-
           snapshot
             .data()
             .messages ||
           [];
 
-
         console.log(
-
           "Realtime messages received:",
-
           messages
-
         );
-
 
         callback(
           messages
@@ -393,20 +336,14 @@ export function subscribeToMessages(
       }
 
     },
-
-
     (error) => {
 
       console.error(
-
         "Message realtime error:",
-
         error
-
       );
 
     }
-
   );
 
 }
@@ -418,37 +355,50 @@ export function subscribeToMessages(
 
 export async function saveMessages(
   chatId,
-  messages
+  messages,
+  scope = CHAT_SCOPE
 ) {
 
-  await setDoc(
-
-    messagesRef(
-      chatId
-    ),
-
-    {
-
-      messages,
-
-    }
-
-  );
-
-
-  await updateDoc(
-
+  const chatRef =
     chatDocRef(
-      chatId
-    ),
+      chatId,
+      scope
+    );
 
+  // ====================================================
+  // STEP 1 — ENSURE THE PARENT CHAT DOCUMENT EXISTS
+  //
+  // Image Studio can temporarily hold a stale active
+  // chat id after realtime deletion/reconciliation.
+  //
+  // setDoc(..., { merge: true }) prevents
+  // "No document to update" while preserving the
+  // existing chat title and createdAt fields.
+  // ====================================================
+
+  await setDoc(
+    chatRef,
     {
-
       updatedAt:
         serverTimestamp(),
-
+    },
+    {
+      merge: true,
     }
+  );
 
+  // ====================================================
+  // STEP 2 — SAVE MESSAGE DATA
+  // ====================================================
+
+  await setDoc(
+    messagesRef(
+      chatId,
+      scope
+    ),
+    {
+      messages,
+    }
   );
 
 }
@@ -459,52 +409,51 @@ export async function saveMessages(
 // ======================================================
 
 export async function clearChatMessages(
-  chatId
+  chatId,
+  scope = CHAT_SCOPE
 ) {
 
   if (!chatId) {
-
     throw new Error(
       "Chat ID is required."
     );
-
   }
 
-
-  await setDoc(
-
-    messagesRef(
-      chatId
-    ),
-
-    {
-
-      messages: [],
-
-    }
-
-  );
-
-
-  await updateDoc(
-
+  const chatRef =
     chatDocRef(
-      chatId
-    ),
+      chatId,
+      scope
+    );
 
+  // Ensure the parent exists before clearing.
+  await setDoc(
+    chatRef,
     {
-
+      title:
+        "New Chat",
       updatedAt:
         serverTimestamp(),
-
+    },
+    {
+      merge: true,
     }
-
   );
 
+  await setDoc(
+    messagesRef(
+      chatId,
+      scope
+    ),
+    {
+      messages: [],
+    }
+  );
 
   console.log(
     "🧹 Conversation cleared:",
-    chatId
+    chatId,
+    "scope:",
+    scope
   );
 
 }
@@ -516,24 +465,25 @@ export async function clearChatMessages(
 
 export async function updateChatTitle(
   chatId,
-  title
+  title,
+  scope = CHAT_SCOPE
 ) {
 
-  await updateDoc(
-
+  // Use merge instead of updateDoc so a stale/missing
+  // Image Studio parent document is recreated safely.
+  await setDoc(
     chatDocRef(
-      chatId
+      chatId,
+      scope
     ),
-
     {
-
       title,
-
       updatedAt:
         serverTimestamp(),
-
+    },
+    {
+      merge: true,
     }
-
   );
 
 }
@@ -545,56 +495,54 @@ export async function updateChatTitle(
 // Firestore does NOT automatically delete nested
 // documents when their parent document is deleted.
 //
-// Nyxora stores messages here:
-//
+// Normal Chat:
 // users/{uid}/chats/{chatId}/data/messages
+//
+// Image Studio:
+// users/{uid}/imageStudioChats/{chatId}/data/messages
 //
 // Therefore the messages document is deleted first,
 // followed by the parent chat document.
 // ======================================================
 
 export async function deleteChat(
-  chatId
+  chatId,
+  scope = CHAT_SCOPE
 ) {
 
   if (!chatId) {
-
     throw new Error(
       "Chat ID is required."
     );
-
   }
-
 
   // ====================================================
   // STEP 1 — DELETE MESSAGE DATA
   // ====================================================
 
   await deleteDoc(
-
     messagesRef(
-      chatId
+      chatId,
+      scope
     )
-
   );
-
 
   // ====================================================
   // STEP 2 — DELETE PARENT CHAT
   // ====================================================
 
   await deleteDoc(
-
     chatDocRef(
-      chatId
+      chatId,
+      scope
     )
-
   );
-
 
   console.log(
     "🗑️ Chat and message data deleted:",
-    chatId
+    chatId,
+    "scope:",
+    scope
   );
 
 }

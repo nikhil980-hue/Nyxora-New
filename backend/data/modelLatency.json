@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "updatedAt": "2026-09-18T16:49:40.031Z",
+  "models": {
+    "groq-fast-20b": {
+      "samples": 8,
+      "successes": 8,
+      "failures": 0,
+      "ewmaFirstTextMs": 1199.7247983452169,
+      "lastFirstTextMs": 1683,
+      "lastUpdatedAt": "2026-09-18T16:27:08.760Z"
+    },
+    "cohere-command-a-plus": {
+      "samples": 4,
+      "successes": 4,
+      "failures": 0,
+      "ewmaFirstTextMs": 3152.8145843874977,
+      "lastFirstTextMs": 2147,
+      "lastUpdatedAt": "2026-09-18T16:49:39.028Z"
+    },
+    "nvidia-reasoning-ultra": {
+      "samples": 1,
+      "successes": 1,
+      "failures": 0,
+      "ewmaFirstTextMs": 37226.2536,
+      "lastFirstTextMs": 37226,
+      "lastUpdatedAt": "2026-09-18T14:51:31.778Z"
+    }
+  }
+}

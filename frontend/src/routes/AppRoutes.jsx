@@ -204,6 +204,36 @@ export default function AppRoutes() {
 
 
 
+        {/* IMAGE STUDIO */}
+
+
+        <Route
+
+          path="/image-studio"
+
+          element={
+
+
+            <ProtectedRoute>
+
+
+              <Chat imageStudio />
+
+
+            </ProtectedRoute>
+
+
+          }
+
+        />
+
+
+
+
+
+
+
+
         {/* WORKSPACE */}
 
 

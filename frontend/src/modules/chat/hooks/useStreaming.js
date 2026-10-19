@@ -1,254 +1,924 @@
-import {
-  generateResponse,
-} from "../services/geminiService";
+import { auth } from "../../../firebase/firebase";
+import { saveMessages } from "../services/chatHistoryService";
 
-import {
-  saveMessages,
-} from "../services/chatHistoryService";
+let controller = null;
+
+// ======================================================
+// API BASE URL
+//
+// Desktop:
+//   localhost -> localhost:5000
+//
+// Phone/tablet on same Wi-Fi:
+//   automatically uses the laptop's IP address
+//
+// Production:
+//   VITE_API_URL can be provided in .env
+// ======================================================
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+      ? "http://localhost:5000"
+      : `http://${window.location.hostname}:5000`
+  );
 
 
 // ======================================================
-// STREAM AI RESPONSE
+// FILE TO BASE64
 // ======================================================
 
-export async function streamResponse({
+async function fileToBase64(
+  file
+) {
 
-  // Full prompt sent to AI.
-  // May contain assistant-mode instructions.
-  prompt,
+  return new Promise(
+    (
+      resolve,
+      reject
+    ) => {
 
-  // Clean original user message.
-  // Used by backend memory system.
-  memoryMessage,
+      const reader =
+        new FileReader();
 
-  file,
 
-  files,
+      reader.onload = () => {
 
-  history,
+        try {
 
-  messages,
+          const result =
+            reader.result;
 
-  aiMessageId,
-
-  activeChatId,
-
-  setChats,
-
-  setIsThinking,
-
-  userId,
-
-  memory,
-
-  mode,
-
-}) {
-
-  let finalStreamText = "";
-
-
-  try {
-
-    await generateResponse(
-
-      prompt,
-
-      (streamText) => {
-
-        finalStreamText =
-          streamText;
-
-
-        // ==========================================
-        // UPDATE CURRENT TAB DURING STREAMING
-        // ==========================================
-
-        setChats((prev) =>
-          prev.map((chat) => {
-
-            if (
-              chat.id !== activeChatId
-            ) {
-
-              return chat;
-
-            }
-
-
-            return {
-
-              ...chat,
-
-              messages:
-                chat.messages.map(
-                  (msg) =>
-
-                    msg.id === aiMessageId
-
-                      ? {
-                          ...msg,
-                          message:
-                            streamText,
-                        }
-
-                      : msg
-
-                ),
-
-            };
-
-          })
-        );
-
-      },
-
-      file,
-
-      files,
-
-      history,
-
-
-      // ==========================================
-      // PERSONAL AI DATA
-      // ==========================================
-
-      userId,
-
-      memory,
-
-
-      // ==========================================
-      // CLEAN MESSAGE FOR MEMORY
-      // ==========================================
-
-      memoryMessage
-
-    );
-
-
-    // ==========================================
-    // SAVE FINAL RESPONSE TO FIRESTORE
-    // ==========================================
-
-    if (finalStreamText) {
-
-      const finalMessages =
-        messages.map((msg) =>
-
-          msg.id === aiMessageId
-
-            ? {
-                ...msg,
-                message:
-                  finalStreamText,
-              }
-
-            : msg
-
-        );
-
-
-      await saveMessages(
-        activeChatId,
-        finalMessages
-      );
-
-
-      console.log(
-        "Final AI response saved to Firestore"
-      );
-
-    }
-
-  }
-
-
-  catch (error) {
-
-    console.error(
-      "Streaming error:",
-      error
-    );
-
-
-    if (
-      error.name !==
-      "AbortError"
-    ) {
-
-      const errorMessage =
-        "❌ Something went wrong while generating the response.";
-
-
-      const errorMessages =
-        messages.map((msg) =>
-
-          msg.id === aiMessageId
-
-            ? {
-                ...msg,
-                message:
-                  errorMessage,
-              }
-
-            : msg
-
-        );
-
-
-      setChats((prev) =>
-        prev.map((chat) => {
 
           if (
-            chat.id !== activeChatId
+            typeof result !==
+            "string"
           ) {
 
-            return chat;
+            reject(
+              new Error(
+                "Unable to read attachment."
+              )
+            );
+
+            return;
 
           }
 
 
-          return {
-
-            ...chat,
-
-            messages:
-              chat.messages.map(
-                (msg) =>
-
-                  msg.id === aiMessageId
-
-                    ? {
-                        ...msg,
-                        message:
-                          errorMessage,
-                      }
-
-                    : msg
-
-              ),
-
-          };
-
-        })
-      );
+          const commaIndex =
+            result.indexOf(",");
 
 
-      await saveMessages(
-        activeChatId,
-        errorMessages
+          if (
+            commaIndex === -1
+          ) {
+
+            reject(
+              new Error(
+                "Invalid attachment data."
+              )
+            );
+
+            return;
+
+          }
+
+
+          const base64 =
+            result.slice(
+              commaIndex + 1
+            );
+
+
+          resolve(base64);
+
+        } catch (error) {
+
+          reject(error);
+
+        }
+
+      };
+
+
+      reader.onerror = () => {
+
+        reject(
+          reader.error ||
+          new Error(
+            "Unable to read attachment."
+          )
+        );
+
+      };
+
+
+      reader.readAsDataURL(
+        file
       );
 
     }
+  );
+
+}
+
+
+// ======================================================
+// GET FILE MIME TYPE
+// ======================================================
+
+function getMimeType(
+  file
+) {
+
+  if (!file) {
+
+    return "";
+
+  }
+
+  if (file.type) {
+
+    return file.type;
+
+  }
+
+  const name =
+    String(
+      file.name || ""
+    ).toLowerCase();
+
+
+  if (
+    name.endsWith(".pdf")
+  ) {
+
+    return "application/pdf";
 
   }
 
 
-  finally {
+  if (
+    name.endsWith(".png")
+  ) {
 
-    setIsThinking(false);
+    return "image/png";
+
+  }
+
+
+  if (
+    name.endsWith(".jpg") ||
+    name.endsWith(".jpeg")
+  ) {
+
+    return "image/jpeg";
+
+  }
+
+
+  if (
+    name.endsWith(".webp")
+  ) {
+
+    return "image/webp";
+
+  }
+
+
+  return (
+    "application/octet-stream"
+  );
+
+}
+
+
+// ======================================================
+// CHECK SUPPORTED AI ATTACHMENT
+//
+// The backend owns document parsing and multimodal routing.
+// Keep the original file available for every supported
+// document type instead of limiting the frontend transport
+// to PDF/image only.
+//
+// The backend Document Intelligence service can then decide
+// whether the file needs text extraction, visual inspection,
+// or both.
+// ======================================================
+
+const DIRECT_DOCUMENT_EXTENSIONS =
+  new Set([
+    "pdf",
+    "doc",
+    "docx",
+    "xls",
+    "xlsx",
+    "csv",
+    "tsv",
+    "ppt",
+    "pptx",
+    "odt",
+    "ods",
+    "odp",
+    "rtf",
+    "md",
+    "txt",
+    "html",
+    "htm",
+    "xml",
+    "json",
+    "yaml",
+    "yml",
+    "log",
+    "env",
+    "ini",
+    "conf",
+    "zip",
+  ]);
+
+function isSupportedAIAttachment(
+  mimeType,
+  extension = ""
+) {
+
+  const normalizedMimeType =
+    String(
+      mimeType || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const normalizedExtension =
+    String(
+      extension || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  return (
+    normalizedMimeType.startsWith(
+      "image/"
+    ) ||
+    normalizedMimeType.startsWith(
+      "text/"
+    ) ||
+    normalizedMimeType.startsWith(
+      "application/"
+    ) ||
+    DIRECT_DOCUMENT_EXTENSIONS.has(
+      normalizedExtension
+    )
+  );
+
+}
+
+
+// ======================================================
+// BUILD ATTACHMENT
+// ======================================================
+
+async function buildAttachment(
+  file
+) {
+
+  if (!file) {
+
+    return null;
+
+  }
+
+  const mimeType =
+    getMimeType(file);
+
+  const extension =
+    String(
+      file.name || ""
+    )
+      .toLowerCase()
+      .match(/\.([a-z0-9]+)$/i)?.[1] ||
+    "";
+
+  if (
+    !isSupportedAIAttachment(
+      mimeType,
+      extension
+    )
+  ) {
+
+    console.warn(
+      "[Nyxora Attachments] Unsupported file skipped:",
+      file.name || "Attachment",
+      mimeType
+    );
+
+    return null;
+
+  }
+
+
+  const data =
+    await fileToBase64(
+      file
+    );
+
+
+  return {
+
+    data,
+
+    mimeType,
+
+    name:
+      file.name ||
+      "Attachment",
+
+    size:
+      Number(
+        file.size || 0
+      ),
+
+  };
+
+}
+
+
+// ======================================================
+// GENERATE RESPONSE
+// ======================================================
+
+export async function generateResponse(
+
+  prompt,
+
+  onChunk,
+
+  file = null,
+
+  files = [],
+
+  history = [],
+
+  userId = null,
+
+  memory = null,
+
+  memoryMessage = null,
+
+  mode = null,
+
+  jarvisMode = false
+
+) {
+
+  // ====================================================
+  // ABORT PREVIOUS REQUEST IF NECESSARY
+  // ====================================================
+
+  if (controller) {
+
+    controller.abort();
+
+  }
+
+
+  controller =
+    new AbortController();
+
+
+  try {
+
+    // ==================================================
+    // PREPARE GENERIC ATTACHMENT
+    //
+    // Supported directly:
+    // - image/*
+    // - application/pdf
+    //
+    // PDF is sent as the ORIGINAL document so Gemini can
+    // inspect visual content that pdf.js text extraction
+    // cannot see.
+    // ==================================================
+
+const attachmentFiles =
+  Array.isArray(
+    files
+  ) &&
+  files.length > 0
+
+    ? files
+
+    : file
+      ? [
+          file
+        ]
+
+      : [];
+
+
+const attachments =
+  (
+    await Promise.all(
+      attachmentFiles.map(
+        (
+          selectedFile
+        ) =>
+          buildAttachment(
+            selectedFile
+          )
+      )
+    )
+  ).filter(
+    Boolean
+  );
+
+
+const attachment =
+  attachments[0] ||
+  null;
+
+
+    // ==================================================
+    // DOCUMENT REQUEST CONTRACT
+    //
+    // Every uploaded file is transported once through the
+    // generic `attachments` array. The backend owns the
+    // document-intelligence decision:
+    //
+    // PDF/DOCX/XLSX/PPTX/etc.
+    //        -> Document Intelligence
+    //        -> document model pool
+    //        -> Gemini only as fallback
+    //
+    // Do NOT duplicate image bytes in a second legacy field.
+    // This prevents large PDF/image requests from being sent
+    // twice over the network.
+    // ==================================================
+
+    const hasAttachments =
+      attachments.length > 0;
+
+    console.log(
+      "[Nyxora Attachments] REQUEST ->",
+      {
+        count:
+          attachments.length,
+        files:
+          attachments.map(
+            (item) => ({
+              name:
+                item.name,
+              mimeType:
+                item.mimeType,
+              size:
+                item.size,
+            })
+          ),
+        documentAnalysis:
+          hasAttachments,
+      }
+    );
+
+
+    // ==================================================
+    // SEND REQUEST
+    // ==================================================
+
+    let authToken = "";
+    try {
+      if (auth.currentUser) {
+        authToken = await auth.currentUser.getIdToken();
+      }
+    } catch (error) {
+      console.warn("[Nyxora Auth] Unable to refresh Firebase token:", error?.message || error);
+    }
+
+    const requestHeaders = {
+      "Content-Type": "application/json",
+    };
+
+    if (authToken) {
+      requestHeaders.Authorization = `Bearer ${authToken}`;
+    }
+
+    const response =
+      await fetch(
+
+        `${API_BASE_URL}/api/chat`,
+
+        {
+
+          method:
+            "POST",
+
+
+          headers: requestHeaders,
+
+
+          body:
+            JSON.stringify({
+
+              // Full internal prompt used
+              // for AI generation.
+              message:
+                prompt,
+
+
+              // Clean original user message
+              // used by backend memory.
+              memoryMessage:
+                memoryMessage ??
+                prompt,
+
+
+              // New generic attachment.
+              //
+              // Images:
+              // {
+              //   data,
+              //   mimeType: "image/...",
+              //   name
+              // }
+              //
+              // PDFs:
+              // {
+              //   data,
+              //   mimeType: "application/pdf",
+              //   name
+              // }
+              attachment,
+
+              attachments,
+
+              // Explicitly tell the backend that this request
+              // contains uploaded document/media data. The
+              // backend remains responsible for deciding the
+              // correct document routing task.
+              documentAnalysis:
+                hasAttachments,
+
+              history,
+
+              userId,
+
+              memory,
+
+              mode,
+
+              jarvisMode,
+
+            }),
+
+
+          signal:
+            controller.signal,
+
+        }
+
+      );
+
+
+    // ==================================================
+    // HANDLE HTTP ERROR
+    // ==================================================
+
+    if (!response.ok) {
+
+      let errorMessage =
+        "Failed to connect to AI server.";
+
+
+      try {
+
+        const errorText =
+          await response.text();
+
+
+        if (errorText) {
+
+          // Backend may return JSON.
+
+          try {
+
+            const parsed =
+              JSON.parse(
+                errorText
+              );
+
+
+            errorMessage =
+              parsed.reply ||
+              parsed.message ||
+              errorText;
+
+          } catch {
+
+            errorMessage =
+              errorText;
+
+          }
+
+        }
+
+      } catch {
+
+        // Keep default message.
+
+      }
+
+
+      throw new Error(
+        errorMessage
+      );
+
+    }
+
+
+    // ==================================================
+    // STREAM VALIDATION
+    // ==================================================
+
+    if (!response.body) {
+
+      throw new Error(
+        "Streaming is not supported."
+      );
+
+    }
+
+
+    const reader =
+      response.body.getReader();
+
+
+    const decoder =
+      new TextDecoder();
+
+
+    let fullResponse =
+      "";
+
+
+    // ==================================================
+    // READ STREAM
+    // ==================================================
+
+    while (true) {
+
+      const {
+        done,
+        value,
+      } =
+        await reader.read();
+
+
+      if (done) {
+
+        break;
+
+      }
+
+
+      const chunk =
+        decoder.decode(
+
+          value,
+
+          {
+            stream: true,
+          }
+
+        );
+
+
+      fullResponse +=
+        chunk;
+
+
+      if (onChunk) {
+
+        onChunk(
+          fullResponse
+        );
+
+      }
+
+    }
+
+
+    // ==================================================
+    // FLUSH DECODER
+    // ==================================================
+
+    const remaining =
+      decoder.decode();
+
+
+    if (remaining) {
+
+      fullResponse +=
+        remaining;
+
+
+      if (onChunk) {
+
+        onChunk(
+          fullResponse
+        );
+
+      }
+
+    }
+
+
+    return fullResponse;
+
+  } catch (error) {
+
+    // ==================================================
+    // STOP GENERATION
+    // ==================================================
+
+    if (
+      error?.name ===
+      "AbortError"
+    ) {
+
+      console.log(
+        "⏹️ AI generation stopped."
+      );
+
+
+      return "";
+
+    }
+
+
+    throw error;
+
+  } finally {
+
+    controller =
+      null;
+
+  }
+
+}
+
+
+// ======================================================
+// CHAT STREAM RESPONSE
+// ======================================================
+//
+// useChat.js imports `streamResponse` from this module.
+// The lower-level `generateResponse` function handles the
+// HTTP request and raw streaming. This adapter connects that
+// stream to the chat state used by useChat.js.
+//
+// Keep this as the public chat-facing API so regenerate,
+// edit-message, and normal send all use the same transport.
+//
+export async function streamResponse({
+  prompt = "",
+  memoryMessage = null,
+  file = null,
+  files = [],
+  history = [],
+  messages = [],
+  aiMessageId = null,
+  activeChatId = null,
+  setChats,
+  setIsThinking,
+  userId = null,
+  memory = null,
+  mode = null,
+  historyScope = "chat",
+  jarvisMode = false,
+}) {
+  if (typeof setChats !== "function") {
+    throw new Error("streamResponse requires setChats.");
+  }
+
+  if (!activeChatId) {
+    throw new Error("streamResponse requires activeChatId.");
+  }
+
+  if (!aiMessageId) {
+    throw new Error("streamResponse requires aiMessageId.");
+  }
+
+  let latestResponse = "";
+
+  const updateAssistantMessage = (value) => {
+    latestResponse = String(value || "");
+
+    setChats((previousChats) =>
+      previousChats.map((chat) => {
+        if (chat.id !== activeChatId) {
+          return chat;
+        }
+
+        return {
+          ...chat,
+          messages: (chat.messages || []).map((message) =>
+            message.id === aiMessageId
+              ? {
+                  ...message,
+                  message: latestResponse,
+                }
+              : message
+          ),
+        };
+      })
+    );
+  };
+
+  try {
+    if (typeof setIsThinking === "function") {
+      setIsThinking(true);
+    }
+
+    const response = await generateResponse(
+      prompt,
+      updateAssistantMessage,
+      file,
+      files,
+      history,
+      userId,
+      memory,
+      memoryMessage,
+      mode,
+      jarvisMode
+    );
+
+    latestResponse = String(response || "");
+
+    // Always write the final complete assistant message once.
+    setChats((previousChats) =>
+      previousChats.map((chat) => {
+        if (chat.id !== activeChatId) {
+          return chat;
+        }
+
+        return {
+          ...chat,
+          messages: (chat.messages || []).map((message) =>
+            message.id === aiMessageId
+              ? {
+                  ...message,
+                  message: latestResponse,
+                }
+              : message
+          ),
+        };
+      })
+    );
+
+    const finalMessages = (messages || []).map((message) =>
+      message.id === aiMessageId
+        ? {
+            ...message,
+            message: latestResponse,
+          }
+        : message
+    );
+
+    await saveMessages(
+      activeChatId,
+      finalMessages,
+      historyScope
+    );
+
+    return latestResponse;
+  } catch (error) {
+    console.error(
+      "[Nyxora Streaming] streamResponse failed:",
+      error
+    );
+
+    throw error;
+  } finally {
+    if (typeof setIsThinking === "function") {
+      setIsThinking(false);
+    }
+  }
+}
+
+
+// ======================================================
+// STOP GENERATION
+// ======================================================
+
+export function stopGeneration() {
+
+  if (controller) {
+
+    controller.abort();
+
+    controller =
+      null;
 
   }
 

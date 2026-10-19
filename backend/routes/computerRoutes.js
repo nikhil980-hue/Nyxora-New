@@ -1,0 +1,21 @@
+import express from "express";
+import { optionalFirebaseAuth } from "../middleware/securityMiddleware.js";
+import * as controller from "../controllers/computerController.js";
+
+const router = express.Router();
+router.use(optionalFirebaseAuth);
+router.get("/pointer", controller.pointer);
+router.post("/move", controller.move);
+router.post("/click", controller.click);
+router.post("/type", controller.type);
+router.post("/key", controller.key);
+router.post("/hotkeys", controller.hotkeys);
+router.get("/environment", controller.environment);
+router.post("/app/open", controller.openApp);
+router.get("/os/status", controller.osStatus);
+router.post("/os/open-url", controller.osOpenUrl);
+router.post("/os/power", controller.osPower);
+router.get("/screen", controller.screenObserve);
+router.post("/screen/analyze", controller.screenAnalyze);
+router.post("/verify", controller.verify);
+export default router;

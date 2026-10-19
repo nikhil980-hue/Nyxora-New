@@ -11,449 +11,420 @@ const router = express.Router();
 
 
 // ======================================================
-// GEMINI IMAGE MODELS
+// IMAGE STUDIO — CLOUDFLARE WORKERS AI
+// ======================================================
+//
+// Image Studio is intentionally separate from the existing
+// Pexels pipeline used by PPT/Notes image workflows.
+//
+// Verified model:
+// @cf/black-forest-labs/flux-2-klein-4b
+//
+// The model accepts multipart/form-data:
+// - prompt
+// - input_image_0 ... input_image_3 for references
 // ======================================================
 
-
-const IMAGE_MODELS = [
-
-  "gemini-2.5-flash-image",
-
-  "gemini-3.1-flash-image",
-
-  "gemini-3-pro-image"
-
-];
-
-
-
-
-// ======================================================
-// GEMINI IMAGE GENERATION
-// ======================================================
-
-
-async function generateGeminiImage(
-
-  prompt
-
-){
-
-
-  const ai =
-
-  new GoogleGenAI({
-
-    apiKey:
-
-      process.env.GEMINI_API_KEY
-
-  });
-
-
-
-
-  let lastError = null;
-
-
-
-
-  for(
-
-    const model of IMAGE_MODELS
-
-  ){
-
-
-    try{
-
-
-      console.log(
-
-        "Trying Gemini image model:",
-
-        model
-
-      );
-
-
-
-
-
-      const response =
-
-      await ai.models.generateContent({
-
-        model,
-
-
-        contents:[
-
-          {
-
-            role:"user",
-
-
-            parts:[
-
-              {
-
-                text:
-
-`Create a premium presentation image.
-
-Topic:
-${prompt}
-
-Style:
-- Apple keynote quality
-- Professional educational visual
-- Realistic
-- Cinematic lighting
-- Clean composition
-- No text
-- No watermark`
-
-              }
-
-            ]
-
-          }
-
-        ]
-
-
-      });
-
-
-
-
-
-
-
-      const imagePart =
-
-      response
-
-      ?.candidates
-
-      ?. [0]
-
-      ?.content
-
-      ?.parts
-
-      ?.find(
-
-        part =>
-
-        part.inlineData
-
-      );
-
-
-
-
-
-
-
-      if(imagePart){
-
-
-        return {
-
-          source:"gemini",
-
-
-          image:
-
-          `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`
-
-        };
-
-
-      }
-
-
-
-      throw new Error(
-
-        "No Gemini image returned"
-
-      );
-
-
-
-    }
-
-
-    catch(error){
-
-
-      console.log(
-
-        model,
-
-        "failed:",
-
-        error.message
-
-      );
-
-
-      lastError = error;
-
-
-    }
-
-
+const CLOUDFLARE_IMAGE_MODEL =
+  "@cf/black-forest-labs/flux-2-klein-4b";
+
+const CLOUDFLARE_IMAGE_ENDPOINT = () => {
+  const accountId =
+    String(
+      process.env.CLOUDFLARE_ACCOUNT_ID || ""
+    ).trim();
+
+  if (!accountId) {
+    throw new Error(
+      "CLOUDFLARE_ACCOUNT_ID is missing."
+    );
   }
 
+  return (
+    `https://api.cloudflare.com/client/v4/accounts/` +
+    `${accountId}/ai/run/${CLOUDFLARE_IMAGE_MODEL}`
+  );
+};
 
+function normalizeImageData(value) {
+  if (
+    typeof value !== "string" ||
+    !value.trim()
+  ) {
+    return null;
+  }
 
+  const normalized =
+    value.trim();
 
+  if (
+    normalized.startsWith("data:image/")
+  ) {
+    return normalized;
+  }
 
-  throw lastError;
-
+  return null;
 }
 
+function dataUrlToBlob(dataUrl) {
+  const match =
+    /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/s.exec(
+      dataUrl
+    );
 
+  if (!match) {
+    throw new Error(
+      "Invalid reference image data."
+    );
+  }
 
+  const mimeType =
+    match[1];
 
+  const buffer =
+    Buffer.from(
+      match[2],
+      "base64"
+    );
 
+  if (!buffer.length) {
+    throw new Error(
+      "Reference image data is empty."
+    );
+  }
 
+  return {
+    blob: new Blob(
+      [buffer],
+      {
+        type: mimeType,
+      }
+    ),
+    mimeType,
+  };
+}
 
+function getCloudflareImageModel(model = "auto") {
+  const value =
+    typeof model === "string"
+      ? model.trim().toLowerCase()
+      : "";
 
+  if (
+    !value ||
+    value === "auto" ||
+    value === "klein" ||
+    value === "flux-2-klein-4b" ||
+    value === CLOUDFLARE_IMAGE_MODEL
+  ) {
+    return CLOUDFLARE_IMAGE_MODEL;
+  }
+
+  // Older frontend values were Pollinations model aliases.
+  // They are no longer valid Image Studio providers.
+  throw new Error(
+    `Unsupported Image Studio model "${model}". ` +
+    `Use Auto or FLUX.2 Klein 4B.`
+  );
+}
+
+async function generateCloudflareImage({
+  prompt,
+  references = [],
+  model = "auto",
+}) {
+  const apiToken =
+    String(
+      process.env.CLOUDFLARE_API_TOKEN || ""
+    ).trim();
+
+  if (!apiToken) {
+    throw new Error(
+      "CLOUDFLARE_API_TOKEN is missing."
+    );
+  }
+
+  const selectedModel =
+    getCloudflareImageModel(
+      model
+    );
+
+  const validReferences =
+    references
+      .map(normalizeImageData)
+      .filter(Boolean)
+      .slice(0, 4);
+
+  const formData =
+    new FormData();
+
+  formData.append(
+    "prompt",
+    String(prompt || "").trim()
+  );
+
+  for (
+    let index = 0;
+    index < validReferences.length;
+    index += 1
+  ) {
+    const {
+      blob,
+      mimeType,
+    } =
+      dataUrlToBlob(
+        validReferences[index]
+      );
+
+    const extension =
+      mimeType.split("/")[1] ||
+      "png";
+
+    formData.append(
+      `input_image_${index}`,
+      blob,
+      `reference-${index + 1}.${extension}`
+    );
+  }
+
+  const response =
+    await fetch(
+      CLOUDFLARE_IMAGE_ENDPOINT(),
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            `Bearer ${apiToken}`,
+        },
+        body: formData,
+      }
+    );
+
+  const contentType =
+    String(
+      response.headers.get(
+        "content-type"
+      ) || ""
+    ).toLowerCase();
+
+  if (!response.ok) {
+    let message =
+      `Cloudflare image generation failed (${response.status}).`;
+
+    if (
+      contentType.includes(
+        "application/json"
+      )
+    ) {
+      try {
+        const errorBody =
+          await response.json();
+
+        const apiMessage =
+          errorBody?.errors?.[0]?.message ||
+          errorBody?.result?.error ||
+          errorBody?.message;
+
+        if (apiMessage) {
+          message += ` ${apiMessage}`;
+        }
+      } catch {
+        // Keep the HTTP status message.
+      }
+    } else {
+      try {
+        const text =
+          await response.text();
+
+        if (text.trim()) {
+          message += ` ${text.trim().slice(0, 500)}`;
+        }
+      } catch {
+        // Keep the HTTP status message.
+      }
+    }
+
+    throw new Error(
+      message
+    );
+  }
+
+  // Workers AI image models return the generated image
+  // as binary image data for the REST endpoint.
+  if (
+    contentType.startsWith(
+      "image/"
+    )
+  ) {
+    const arrayBuffer =
+      await response.arrayBuffer();
+
+    const base64 =
+      Buffer
+        .from(arrayBuffer)
+        .toString("base64");
+
+    return {
+      source: "cloudflare",
+      provider: "cloudflare",
+      model: selectedModel,
+      image:
+        `data:${contentType.split(";")[0]};base64,${base64}`,
+      edit:
+        validReferences.length > 0,
+      hasReferences:
+        validReferences.length > 0,
+    };
+  }
+
+  // Keep a JSON fallback for API response variants.
+  let body = null;
+
+  try {
+    body =
+      await response.json();
+  } catch {
+    body = null;
+  }
+
+  const resultImage =
+    body?.result?.image ||
+    body?.result?.output ||
+    body?.image ||
+    body?.imageUrl;
+
+  if (!resultImage) {
+    throw new Error(
+      "Cloudflare returned no generated image."
+    );
+  }
+
+  const image =
+    typeof resultImage === "string" &&
+    resultImage.startsWith("data:image/")
+      ? resultImage
+      : `data:image/png;base64,${resultImage}`;
+
+  return {
+    source: "cloudflare",
+    provider: "cloudflare",
+    model: selectedModel,
+    image,
+    edit:
+      validReferences.length > 0,
+    hasReferences:
+      validReferences.length > 0,
+  };
+}
 
 // ======================================================
 // PEXELS FREE IMAGE FALLBACK
 // ======================================================
 
+function normalizePexelsQuery(prompt) {
+  const value = String(prompt || "").trim();
 
-async function generatePexelsImage(
-
-  prompt
-
-){
-
-
-
-  if(
-
-    !process.env.PEXELS_API_KEY
-
-  ){
-
-
-    throw new Error(
-
-      "Pexels API key missing."
-
-    );
-
-
+  if (!value) {
+    return "professional presentation topic";
   }
 
-
-
-
-
-  const response =
-
-  await fetch(
-
-`https://api.pexels.com/v1/search?query=${encodeURIComponent(prompt)}&per_page=1`,
-
-    {
-
-
-      headers:{
-
-
-        Authorization:
-
-        process.env.PEXELS_API_KEY
-
-
-      }
-
-
-    }
-
-  );
-
-
-
-
-
-  const data =
-
-  await response.json();
-
-
-
-
-
-
-  const imageUrl =
-
-  data
-
-  ?.photos
-
-  ?. [0]
-
-  ?.src
-
-  ?.large;
-
-
-
-
-
-
-  if(!imageUrl){
-
-
-    throw new Error(
-
-      "No Pexels image found."
-
-    );
-
-
-  }
-
-
-
-
-
-
-
-  const imageResponse =
-
-  await fetch(
-
-    imageUrl
-
-  );
-
-
-
-
-
-  const buffer =
-
-  await imageResponse.arrayBuffer();
-
-
-
-
-
-
-  const base64 =
-
-  Buffer
-
-  .from(buffer)
-
-  .toString("base64");
-
-
-
-
-
-
-
-  return {
-
-
-    source:"pexels",
-
-
-    image:
-
-    `data:image/jpeg;base64,${base64}`
-
-
-  };
-
-
+  return value
+    .replace(/Create one premium presentation visual\.?/gi, "")
+    .replace(/Requirements:[\s\S]*?(?=Image framing:|Do NOT include:|$)/gi, "")
+    .replace(/Image framing:[\s\S]*?(?=Do NOT include:|$)/gi, "")
+    .replace(/Do NOT include:[\s\S]*$/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/[^a-zA-Z0-9,.:&+\- ]/g, " ")
+    .trim()
+    .slice(0, 180) || "professional presentation topic";
 }
 
+async function generatePexelsImage(prompt) {
+  const apiKey =
+    String(process.env.PEXELS_API_KEY || "").trim();
 
+  if (!apiKey) {
+    throw new Error("Pexels API key missing.");
+  }
 
+  const query = normalizePexelsQuery(prompt);
 
+  const response = await fetch(
+    `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1`,
+    {
+      headers: {
+        Authorization: apiKey,
+      },
+    }
+  );
 
+  if (!response.ok) {
+    throw new Error(
+      `Pexels search failed (${response.status}).`
+    );
+  }
 
+  const data = await response.json();
+  const imageUrl = data?.photos?.[0]?.src?.large;
+
+  if (!imageUrl) {
+    throw new Error("No Pexels image found.");
+  }
+
+  const imageResponse = await fetch(imageUrl);
+
+  if (!imageResponse.ok) {
+    throw new Error(
+      `Pexels image download failed (${imageResponse.status}).`
+    );
+  }
+
+  const contentType =
+    String(imageResponse.headers.get("content-type") || "image/jpeg")
+      .split(";")[0]
+      .trim();
+
+  const buffer = await imageResponse.arrayBuffer();
+  const base64 = Buffer.from(buffer).toString("base64");
+
+  return {
+    source: "pexels",
+    provider: "pexels",
+    image: `data:${contentType};base64,${base64}`,
+    query,
+  };
+}
 
 
 
 // ======================================================
 // FINAL IMAGE GENERATOR
+// ======================================================
 //
-// Gemini first
-// Pexels fallback
+// Image Studio:
+// - Cloudflare Workers AI only
+// - FLUX.2 Klein 4B handles generation and editing
+// - references are passed as actual image bytes
+//
+// Pexels is intentionally not used here. Existing Pexels
+// functionality elsewhere in this route remains untouched.
 // ======================================================
 
-
-async function generateImage(
-
- prompt
-
-){
-
-
-
-  try{
-
-
-    return await generateGeminiImage(
-
-      prompt
-
-    );
-
-
-  }
-
-
-  catch(error){
-
-
-
-    console.log(
-
-      "Gemini image unavailable."
-
-    );
-
-
-
-    return await generatePexelsImage(
-
-      prompt
-
-    );
-
-
-  }
-
-
+async function generateImage({
+  prompt,
+  references = [],
+  model = "auto",
+}) {
+  return await generateCloudflareImage({
+    prompt,
+    references,
+    model,
+  });
 }
-
-
-
-
-
-
-
-
 
 // ======================================================
 // POST /api/generate-image
 // ======================================================
-
 
 router.post(
 
@@ -461,85 +432,96 @@ router.post(
 
 async(req,res)=>{
 
-
 try{
-
 
 const {
 
-prompt
+  prompt,
+
+  references = [],
+
+  edit = false,
+
+  model = "auto",
+
+  source = "ai"
 
 }=req.body;
 
 
-
-
-
 if(!prompt){
-
 
 return res.status(400).json({
 
-
 success:false,
-
 
 message:
 
 "Image prompt required."
 
-
 });
-
 
 }
 
 
-
-
+const normalizedReferences =
+  Array.isArray(references)
+    ? references
+        .map(normalizeImageData)
+        .filter(Boolean)
+    : [];
 
 
 const result =
-
-await generateImage(
-
-prompt
-
-);
-
-
-
-
+  String(source || "ai").trim().toLowerCase() === "pexels"
+    ? await generatePexelsImage(prompt)
+    : await generateImage({
+        prompt,
+        references: normalizedReferences,
+        model,
+      });
 
 
 return res.json({
 
-
 success:true,
-
 
 image:
 
 result.image,
 
-
 source:
 
-result.source
+result.source,
 
+provider:
 
+result.source,
+
+model:
+
+result.model ||
+(result.source === "pexels" ? "pexels" : CLOUDFLARE_IMAGE_MODEL),
+
+edit:
+
+Boolean(
+  edit ||
+  result.edit
+),
+
+hasReferences:
+
+Boolean(
+  normalizedReferences.length
+)
 
 });
-
-
-
 
 
 }
 
 catch(error){
-
-
 
 console.error(
 
@@ -550,38 +532,26 @@ error
 );
 
 
-
-
-
 return res.status(500).json({
 
-
 success:false,
-
 
 message:
 
 error.message
 
-
-
 });
 
-
 }
-
-
 
 }
 
 );
 
 
-
-
-
-
 export default router;
+
+
 // ======================================================
 // BACKGROUND SYSTEM
 // ======================================================
@@ -589,62 +559,47 @@ export default router;
 
 function applyPremiumBackground(
 
- page,
+  page,
 
- theme,
+  theme,
 
- index
+  index
 
 ){
 
+  page.background = {
 
- page.background = {
+    color:
 
-  color:
+      cleanColor(
 
-   cleanColor(
+        theme.colors.background ||
 
-    theme.colors.background ||
+        "FFFFFF"
 
-    "FFFFFF"
+      )
 
-   )
-
- };
-
+  };
 
 
+  // no gradient bar on cover
 
- // no gradient bar on cover
+  if(index !== 0){
 
- if(index !== 0){
+    addGradientBar(page);
 
-
-  addGradientBar(page);
-
-
- }
+  }
 
 
+  addDotDecoration(
 
+    page,
 
+    theme
 
- addDotDecoration(
-
-  page,
-
-  theme
-
- );
-
+  );
 
 }
-
-
-
-
-
-
 
 
 
@@ -655,11 +610,9 @@ function applyPremiumBackground(
 
 function addGradientBar(
 
- page
+  page
 
 ){
-
-
 
 const svg = `
 
@@ -773,8 +726,6 @@ fill="url(#premiumGradient)"
 
 
 
-
-
 page.addImage({
 
 data:
@@ -794,14 +745,7 @@ h:0.16
 
 });
 
-
 }
-
-
-
-
-
-
 
 
 
@@ -819,7 +763,6 @@ theme
 
 ){
 
-
 const color =
 
 cleanColor(
@@ -829,9 +772,6 @@ theme.colors.accent ||
 "2563EB"
 
 );
-
-
-
 
 
 for(
@@ -902,15 +842,7 @@ transparency:100
 
 }
 
-
-
 }
-
-
-
-
-
-
 
 
 
@@ -940,9 +872,6 @@ slide,
 theme
 
 );
-
-
-
 
 
 page.addText(
@@ -984,10 +913,6 @@ margin:0
 
 
 );
-
-
-
-
 
 
 
@@ -1038,10 +963,6 @@ margin:0
 
 
 
-
-
-
-
 renderNumberPoints(
 
 page,
@@ -1051,10 +972,6 @@ slide.points || [],
 theme
 
 );
-
-
-
-
 
 
 
@@ -1082,12 +999,6 @@ theme
 
 
 }
-
-
-
-
-
-
 
 
 
@@ -1153,9 +1064,6 @@ transparency:100
 
 
 
-
-
-
 page.addText(
 
 "✦",
@@ -1191,7 +1099,6 @@ margin:0
 
 
 );
-
 
 
 }

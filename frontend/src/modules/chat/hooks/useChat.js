@@ -58,6 +58,181 @@ const MAX_WORKSPACE_RESULTS =
 
 
 // ======================================================
+// IMAGE STUDIO GENERATION
+// ======================================================
+
+const IMAGE_STUDIO_ENDPOINT =
+  "http://localhost:5000/api/generate-image";
+
+async function fileToImageDataUrl(
+  file
+) {
+  return new Promise(
+    (resolve, reject) => {
+      if (!file) {
+        reject(
+          new Error(
+            "Reference image is missing."
+          )
+        );
+        return;
+      }
+
+      const reader =
+        new FileReader();
+
+      reader.onload = () => {
+        const result =
+          reader.result;
+
+        if (
+          typeof result !==
+          "string"
+        ) {
+          reject(
+            new Error(
+              "Unable to read reference image."
+            )
+          );
+          return;
+        }
+
+        resolve(result);
+      };
+
+      reader.onerror = () => {
+        reject(
+          reader.error ||
+          new Error(
+            "Unable to read reference image."
+          )
+        );
+      };
+
+      reader.readAsDataURL(
+        file
+      );
+    }
+  );
+}
+
+
+async function generateImageStudio({
+  prompt,
+  referenceFiles = [],
+  previousImage = "",
+  model = "",
+}) {
+  const references = [];
+
+  for (
+    const file of referenceFiles
+  ) {
+    references.push({
+      data:
+        await fileToImageDataUrl(
+          file
+        ),
+      mimeType:
+        file.type ||
+        "image/jpeg",
+      name:
+        file.name ||
+        "reference-image",
+    });
+  }
+
+  if (
+    references.length === 0 &&
+    previousImage
+  ) {
+    references.push({
+      data:
+        previousImage,
+      mimeType:
+        "image/png",
+      name:
+        "previous-generated-image",
+    });
+  }
+
+  const response =
+    await fetch(
+      IMAGE_STUDIO_ENDPOINT,
+      {
+        method:
+          "POST",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body:
+          JSON.stringify({
+            prompt,
+            references,
+            edit:
+              references.length >
+              0,
+            ...(cleanValue(model)
+              ? {
+                  model:
+                    cleanValue(model),
+                }
+              : {}),
+          }),
+      }
+    );
+
+  let body = null;
+
+  try {
+    body =
+      await response.json();
+  } catch {
+    body = null;
+  }
+
+  if (
+    !response.ok ||
+    !body?.success
+  ) {
+    throw new Error(
+      body?.message ||
+      `Image generation failed with HTTP ${response.status}.`
+    );
+  }
+
+  if (
+    !body.image &&
+    !body.imageUrl
+  ) {
+    throw new Error(
+      "Image generation returned no image."
+    );
+  }
+
+  return {
+    image:
+      body.image ||
+      body.imageUrl,
+    imageUrl:
+      body.imageUrl ||
+      "",
+    provider:
+      body.provider ||
+      "cloudflare",
+    model:
+      body.model ||
+      "",
+    prompt,
+    hasReferences:
+      references.length > 0,
+  };
+}
+
+
+
+// ======================================================
 // PDF GENERATOR MODE
 // ======================================================
 
@@ -1015,7 +1190,16 @@ export default function useChat({
   selectedMode = "normal",
 
   workspaceContext = null,
+
+  imageStudio = false,
+
+  jarvisMode = false,
 }) {
+
+  const historyScope =
+    imageStudio
+      ? "imageStudio"
+      : "chat";
 
   const [
     isThinking,
@@ -1039,11 +1223,33 @@ export default function useChat({
     userMessage,
     file = null
   ) => {
+    const imageStudioMessages = [
+      "Thinking about your idea...",
+      "Understanding your visual direction...",
+      "Planning the composition...",
+      "Creating the initial draft...",
+      "Exploring visual possibilities...",
+      "Building the scene...",
+      "Designing the composition...",
+      "Refining the visual details...",
+      "Balancing lighting and atmosphere...",
+      "Polishing the important details...",
+      "Redefining the composition...",
+      "Making the image more expressive...",
+      "Adding depth and visual character...",
+      "Applying the final visual refinements...",
+      "Making the final touches...",
+      "Finalizing your design...",
+      "Almost ready...",
+    ];
+
     const messages =
-      getThinkingMessages(
-        userMessage,
-        file
-      );
+      imageStudio
+        ? imageStudioMessages
+        : getThinkingMessages(
+            userMessage,
+            file
+          );
 
     if (
       thinkingTimerRef.current
@@ -1053,22 +1259,39 @@ export default function useChat({
       );
     }
 
-    let index = 0;
+    let currentIndex = -1;
+
+    const nextMessage = () => {
+      if (messages.length === 1) {
+        currentIndex = 0;
+        return messages[0];
+      }
+
+      let nextIndex = currentIndex;
+
+      while (nextIndex === currentIndex) {
+        nextIndex =
+          Math.floor(
+            Math.random() *
+              messages.length
+          );
+      }
+
+      currentIndex = nextIndex;
+
+      return messages[currentIndex];
+    };
 
     setThinkingText(
-      messages[0]
+      nextMessage()
     );
 
     setIsThinking(true);
 
     thinkingTimerRef.current =
       window.setInterval(() => {
-        index =
-          (index + 1) %
-          messages.length;
-
         setThinkingText(
-          messages[index]
+          nextMessage()
         );
       }, 1400);
   };
@@ -1103,6 +1326,53 @@ export default function useChat({
 
       setAttachmentError("");
 
+    };
+
+
+  // ====================================================
+  // CHAT PERSISTENCE
+  // ====================================================
+  //
+  // Normal Chat keeps its existing Firestore persistence.
+  // Image Studio is intentionally ephemeral and must never
+  // write its messages or title to the chat history service.
+  //
+
+  const persistMessages =
+    async (
+      chatId,
+      messages,
+      scope = historyScope
+    ) => {
+
+      if (imageStudio) {
+        return;
+      }
+
+      return saveMessages(
+        chatId,
+        messages,
+        scope
+      );
+    };
+
+
+  const persistChatTitle =
+    async (
+      chatId,
+      title,
+      scope = historyScope
+    ) => {
+
+      if (imageStudio) {
+        return;
+      }
+
+      return updateChatTitle(
+        chatId,
+        title,
+        scope
+      );
     };
 
 
@@ -1169,9 +1439,46 @@ const isTestRequest =
           .endsWith(".pdf")
       ) {
 
-        return await extractPdfText(
-          file
-        );
+        try {
+
+          return await extractPdfText(
+            file
+          );
+
+        } catch (error) {
+
+          // PDF.js extraction is only a client-side optimization.
+          // The original PDF is still sent by useStreaming.js to
+          // backend Document Intelligence, so parser failures must
+          // not block the upload.
+          if (
+            error?.code ===
+            PDF_ERROR_CODES
+              .PASSWORD_PROTECTED
+          ) {
+
+            throw error;
+
+          }
+
+          if (
+            error?.code ===
+            PDF_ERROR_CODES
+              .INVALID_PDF
+          ) {
+
+            throw error;
+
+          }
+
+          console.warn(
+            "[Nyxora PDF] Client-side text extraction failed; continuing with original PDF attachment.",
+            error
+          );
+
+          return "";
+
+        }
 
       }
 
@@ -1359,10 +1666,39 @@ ${extractedText}`;
           documentFiles[index];
 
 
-        const extractedText =
-          await extractFileContent(
-            selectedFile
+        let extractedText = "";
+
+        try {
+
+          extractedText =
+            await extractFileContent(
+              selectedFile
+            );
+
+        } catch (error) {
+
+          if (
+            error?.code ===
+            PDF_ERROR_CODES
+              .PASSWORD_PROTECTED ||
+            error?.code ===
+            PDF_ERROR_CODES
+              .INVALID_PDF
+          ) {
+
+            throw error;
+
+          }
+
+          console.warn(
+            "[Nyxora Attachments] Client-side extraction failed; backend will process the original file.",
+            selectedFile?.name || "Attachment",
+            error
           );
+
+          extractedText = "";
+
+        }
 
 
         if (
@@ -2228,7 +2564,7 @@ const addTestGeneratorWarning =
         )
     );
 
-    await saveMessages(
+    await persistMessages(
       activeChatId,
       newMessages
     );
@@ -2240,9 +2576,10 @@ const addTestGeneratorWarning =
     ) {
       try {
 
-        await updateChatTitle(
+        await persistChatTitle(
           activeChatId,
-          generatedTitle
+          generatedTitle,
+          historyScope
         );
 
       } catch (error) {
@@ -2406,9 +2743,10 @@ const addTestGeneratorWarning =
       );
 
 
-      await saveMessages(
+      await persistMessages(
         activeChatId,
-        newMessages
+        newMessages,
+        historyScope
       );
 
 
@@ -2420,9 +2758,10 @@ const addTestGeneratorWarning =
 
         try {
 
-          await updateChatTitle(
+          await persistChatTitle(
             activeChatId,
-            generatedTitle
+            generatedTitle,
+            historyScope
           );
 
         } catch (error) {
@@ -2476,6 +2815,23 @@ const addTestGeneratorWarning =
           : payload?.message ||
           "";
 
+
+      const imageModel =
+        typeof payload ===
+          "string"
+          ? ""
+          : cleanValue(
+              payload?.imageModel ||
+              payload?.model ||
+              ""
+            );
+
+      const requestJarvisMode =
+        typeof payload === "object" &&
+        payload !== null &&
+        typeof payload.jarvisMode === "boolean"
+          ? payload.jarvisMode
+          : Boolean(jarvisMode);
 
       const files =
         typeof payload ===
@@ -2849,9 +3205,10 @@ if (
       );
 
 
-      await saveMessages(
+      await persistMessages(
         activeChatId,
-        newMessages
+        newMessages,
+        historyScope
       );
 
 
@@ -2863,9 +3220,10 @@ if (
 
         try {
 
-          await updateChatTitle(
+          await persistChatTitle(
             activeChatId,
-            generatedTitle
+            generatedTitle,
+            historyScope
           );
 
         } catch (error) {
@@ -2880,6 +3238,268 @@ if (
       }
 
 
+
+      // ==================================================
+      // DEDICATED IMAGE STUDIO GENERATION
+      // ==================================================
+      //
+      // Image Studio must never use the normal text-AI
+      // streaming path. It sends the actual reference
+      // image data to the existing /api/ai-image route.
+      //
+      // If no new reference is supplied, the latest
+      // generated image in this Image Studio conversation
+      // becomes the reference for follow-up edits.
+      // ==================================================
+
+      if (
+        imageStudio
+      ) {
+        const nonImageFiles =
+          files.filter(
+            (selectedFile) =>
+              !selectedFile?.type?.startsWith(
+                "image/"
+              )
+          );
+
+        if (
+          nonImageFiles.length >
+          0
+        ) {
+          const message =
+            "Image Studio references must be image files (PNG, JPEG, JPG, or WebP).";
+
+          setChats(
+            (prev) =>
+              prev.map(
+                (chat) =>
+                  chat.id ===
+                  activeChatId
+                    ? {
+                        ...chat,
+                        messages:
+                          chat.messages.map(
+                            (msg) =>
+                              msg.id ===
+                              aiMessage.id
+                                ? {
+                                    ...msg,
+                                    message:
+                                      message,
+                                  }
+                                : msg
+                          ),
+                      }
+                    : chat
+              )
+          );
+
+          await persistMessages(
+            activeChatId,
+            newMessages.map(
+              (msg) =>
+                msg.id ===
+                aiMessage.id
+                  ? {
+                      ...msg,
+                      message:
+                        message,
+                    }
+                  : msg
+            ),
+            historyScope
+          );
+
+          stopThinking();
+          setIsThinking(false);
+
+          return false;
+        }
+
+        const referenceFiles =
+          files.filter(
+            (selectedFile) =>
+              selectedFile?.type?.startsWith(
+                "image/"
+              )
+          );
+
+        const previousImageIndex =
+          [...history]
+            .map((msg, index) => ({
+              msg,
+              index,
+            }))
+            .reverse()
+            .find(
+              ({ msg }) =>
+                msg.role ===
+                  "assistant" &&
+                typeof msg.image ===
+                  "string" &&
+                msg.image
+            )?.index ?? -1;
+
+        const previousImage =
+          previousImageIndex >= 0
+            ? history[previousImageIndex]?.image || ""
+            : "";
+
+        const previousUserPrompt =
+          previousImageIndex >= 0
+            ? [...history]
+                .slice(0, previousImageIndex)
+                .reverse()
+                .find(
+                  (msg) =>
+                    msg.role ===
+                      "user" &&
+                    typeof msg.message ===
+                      "string" &&
+                    msg.message.trim()
+                )?.message?.trim() || ""
+            : "";
+
+        const imageGenerationPrompt =
+          previousImage
+            ? [
+                "Edit the previous generated image using the attached previous image as the source of truth.",
+                "Preserve the same subject, characters, identity, composition, camera angle, framing, environment, style, and important visual details unless the new instruction explicitly asks to change them.",
+                previousUserPrompt
+                  ? `Previous instruction: ${previousUserPrompt}`
+                  : "",
+                `New instruction: ${cleanUserMessage}`,
+                "Apply the new instruction as a modification of the previous image, not as a completely new unrelated image.",
+              ]
+                .filter(Boolean)
+                .join("\n")
+            : referenceFiles.length > 0
+              ? [
+                  "Use the provided reference image(s) as the source of truth.",
+                  "Preserve the important visual identity and structure of the reference unless the user's instruction explicitly asks to change them.",
+                  `Instruction: ${cleanUserMessage}`,
+                ].join("\n")
+              : cleanUserMessage;
+
+        try {
+          setIsThinking(
+            true
+          );
+
+          const generated =
+            await generateImageStudio({
+              prompt:
+                imageGenerationPrompt,
+              referenceFiles,
+              previousImage,
+              model:
+                imageModel,
+            });
+
+          const generatedMessages =
+            newMessages.map(
+              (msg) =>
+                msg.id ===
+                aiMessage.id
+                  ? {
+                      ...msg,
+                      message:
+                        "",
+                      image:
+                        generated.image,
+                      imageUrl:
+                        generated.imageUrl,
+                      imagePrompt:
+                        generated.prompt,
+                      imageProvider:
+                        generated.provider,
+                      imageModel:
+                        generated.model,
+                    }
+                  : msg
+            );
+
+          setChats(
+            (prev) =>
+              prev.map(
+                (chat) =>
+                  chat.id ===
+                  activeChatId
+                    ? {
+                        ...chat,
+                        messages:
+                          generatedMessages,
+                      }
+                    : chat
+              )
+          );
+
+          await persistMessages(
+            activeChatId,
+            generatedMessages,
+            historyScope
+          );
+
+          stopThinking();
+          setIsThinking(false);
+
+          return true;
+
+        } catch (error) {
+          console.error(
+            "Image Studio generation error:",
+            error
+          );
+
+          const errorMessage =
+            error?.message ||
+            "Image generation failed. Please try again.";
+
+          const failedMessages =
+            newMessages.map(
+              (msg) =>
+                msg.id ===
+                aiMessage.id
+                  ? {
+                      ...msg,
+                      message:
+                        `⚠️ ${errorMessage}`,
+                      image:
+                        "",
+                      imageUrl:
+                        "",
+                    }
+                  : msg
+            );
+
+          setChats(
+            (prev) =>
+              prev.map(
+                (chat) =>
+                  chat.id ===
+                  activeChatId
+                    ? {
+                        ...chat,
+                        messages:
+                          failedMessages,
+                      }
+                    : chat
+              )
+          );
+
+          await persistMessages(
+            activeChatId,
+            failedMessages,
+            historyScope
+          );
+
+          stopThinking();
+          setIsThinking(false);
+
+          return false;
+        }
+      }
 
       try {
 
@@ -2910,6 +3530,10 @@ if (
           userId,
 
           memory,
+
+          historyScope,
+
+          jarvisMode: requestJarvisMode,
 
         });
 
@@ -3101,7 +3725,7 @@ if (
         );
 
 
-        await saveMessages(
+        await persistMessages(
           activeChatId,
           updatedMessages
         );
@@ -3212,7 +3836,7 @@ Example:
   );
 
 
-  await saveMessages(
+  await persistMessages(
     activeChatId,
     updatedMessages
   );
@@ -3313,9 +3937,10 @@ setIsThinking(false);
       );
 
 
-      await saveMessages(
+      await persistMessages(
         activeChatId,
-        updatedMessages
+        updatedMessages,
+        historyScope
       );
 
 
@@ -3352,6 +3977,7 @@ setIsThinking(false);
           userId:
             auth.currentUser?.uid,
 
+          historyScope,
         });
 
 
@@ -3690,7 +4316,7 @@ setIsThinking(false);
         );
 
 
-        await saveMessages(
+        await persistMessages(
           activeChatId,
           updatedMessages
         );
@@ -3719,9 +4345,28 @@ setIsThinking(false);
 
         } catch (error) {
 
-          return handleAttachmentError(
+          if (
+            error?.code ===
+            PDF_ERROR_CODES
+              .PASSWORD_PROTECTED ||
+            error?.code ===
+            PDF_ERROR_CODES
+              .INVALID_PDF
+          ) {
+
+            return handleAttachmentError(
+              error
+            );
+
+          }
+
+          console.warn(
+            "[Nyxora Edit] Client-side extraction failed; continuing with original attachment.",
             error
           );
+
+          userPrompt =
+            cleanUserMessage;
 
         }
 
@@ -3840,9 +4485,10 @@ setIsThinking(false);
       );
 
 
-      await saveMessages(
+      await persistMessages(
         activeChatId,
-        updatedMessages
+        updatedMessages,
+        historyScope
       );
 
 
@@ -3902,6 +4548,7 @@ setIsThinking(false);
           userId:
             auth.currentUser?.uid,
 
+          historyScope,
         });
 
         stopThinking();
@@ -3955,7 +4602,11 @@ setIsThinking(false);
           messages.pop();
         }
 
-        saveMessages(activeChatId, messages).catch(console.error);
+        persistMessages(
+          activeChatId,
+          messages,
+          historyScope
+        ).catch(console.error);
 
         return {
           ...chat,

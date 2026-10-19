@@ -1,6 +1,8 @@
-import {
-  generateResponse,
-} from "../../chat/services/geminiService";
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000"
+).replace(/\/$/, "");
 
 
 
@@ -14,7 +16,9 @@ import {
 
  User Input
       ↓
- Gemini AI
+ Nyxora Model Gateway
+      ↓
+ Multi-Model Pool
       ↓
  Structured Slide JSON
       ↓
@@ -129,50 +133,96 @@ export async function generatePresentation({
 
   let response = "";
 
+  try {
+    const apiResponse = await fetch(
+      `${API_BASE_URL}/api/presentation`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt,
+          mode: "reasoning",
+          topic,
+          subject,
+          className,
+          slideCount,
+          theme,
+          customPrompt,
+          presentationMode:
+            normalizedPresentationMode,
+        }),
+      }
+    );
 
+    const responseText =
+      await apiResponse.text();
 
+    if (!apiResponse.ok) {
+      let errorMessage =
+        "Presentation generation failed.";
 
+      try {
+        const errorPayload =
+          JSON.parse(responseText);
 
+        errorMessage =
+          errorPayload?.error ||
+          errorPayload?.message ||
+          errorMessage;
+      } catch {
+        if (responseText.trim()) {
+          errorMessage =
+            responseText.trim();
+        }
+      }
 
-
-
-  await generateResponse(
-
-
-
-    prompt,
-
-
-
-    (chunk)=>{
-
-
-
-      response = chunk;
-
-
-
+      throw new Error(
+        errorMessage
+      );
     }
 
+    response =
+      responseText.trim();
 
+    try {
+      const payload =
+        JSON.parse(response);
 
-  );
+      response =
+        payload?.presentation ||
+        payload?.result ||
+        payload?.response ||
+        payload?.text ||
+        response;
 
+      if (
+        typeof response !==
+        "string"
+      ) {
+        response =
+          JSON.stringify(
+            response
+          );
+      }
+    } catch {
+      // The presentation endpoint may
+      // return the raw model JSON as text.
+    }
+  } catch (error) {
+    console.error(
+      "Nyxora presentation generation failed:",
+      error
+    );
 
-
-
-
-
-
+    throw error;
+  }
 
   return parsePresentationResponse(
-
     response,
-
     detailMode,
-
     customPrompt
-
   );
 
 

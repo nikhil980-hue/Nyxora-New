@@ -1,0 +1,12 @@
+import express from "express";
+import { optionalFirebaseAuth } from "../middleware/securityMiddleware.js";
+import * as controller from "../controllers/fileSystemController.js";
+const router=express.Router();
+router.use(optionalFirebaseAuth);
+router.get("/root",controller.root);
+router.get("/list",controller.list);
+router.post("/read",controller.read);
+router.post("/write",controller.write);
+router.post("/mkdir",controller.mkdir);
+router.post("/delete",controller.remove);
+export default router;

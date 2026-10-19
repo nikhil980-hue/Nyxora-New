@@ -5,6 +5,7 @@
 //
 // Supports:
 // ✓ Gemini AI image generation
+// ✓ Pexels image search for PPT export
 // ✓ SVG diagrams
 // ✓ SVG icons
 // ✓ PPT compatible assets
@@ -14,21 +15,26 @@
 //
 // Slide JSON
 //      ↓
-// visualType
+// visualType + source
 //      ↓
 // Visual Generator
 //      ↓
-// PPT Export
+// PPT Export / Image Studio
 //
+// IMPORTANT:
+// - Image Studio continues using the existing /api/generate-image route.
+// - PPT image requests can explicitly use source:"pexels" and are routed
+//   to the existing /api/notes-image Pexels pipeline.
+// - Existing SVG/icon/diagram behavior is preserved.
 // ======================================================
-
 
 
 const IMAGE_API_URL =
   "http://localhost:5000/api/generate-image";
 
 
-
+const PEXELS_IMAGE_API_URL =
+  "http://localhost:5000/api/notes-image";
 
 
 // ======================================================
@@ -44,16 +50,30 @@ export async function generateSlideVisual({
 
   diagram,
 
+  source,
 
 }) {
-
 
 
   switch(visualType){
 
 
-
     case "image":
+
+
+      if(
+        String(source || "")
+          .trim()
+          .toLowerCase() === "pexels"
+      ){
+
+        return await generatePexelsVisual(
+
+          prompt
+
+        );
+
+      }
 
 
       return await generateImageVisual(
@@ -61,9 +81,6 @@ export async function generateSlideVisual({
         prompt
 
       );
-
-
-
 
 
     case "diagram":
@@ -76,9 +93,6 @@ export async function generateSlideVisual({
       );
 
 
-
-
-
     case "icon":
 
 
@@ -87,9 +101,6 @@ export async function generateSlideVisual({
         prompt
 
       );
-
-
-
 
 
     default:
@@ -104,23 +115,11 @@ export async function generateSlideVisual({
 }
 
 
-
-
-
-
-
-
-
 // ======================================================
-// GEMINI IMAGE GENERATION
+// IMAGE STUDIO / EXISTING IMAGE GENERATION
 //
-// Returns:
-// {
-//   type:"image",
-//   format:"base64",
-//   data:"data:image/png;base64,..."
-// }
-//
+// This path remains the same endpoint used by Image Studio.
+// It is intentionally NOT replaced by Pexels.
 // ======================================================
 
 
@@ -131,9 +130,7 @@ async function generateImageVisual(
 ){
 
 
-
   try {
-
 
 
     const response =
@@ -145,13 +142,10 @@ async function generateImageVisual(
         {
 
 
-
           method:"POST",
 
 
-
           headers:{
-
 
 
             "Content-Type":
@@ -159,13 +153,10 @@ async function generateImageVisual(
               "application/json",
 
 
-
           },
 
 
-
           body:JSON.stringify({
-
 
 
             prompt:
@@ -201,12 +192,10 @@ IMAGE REQUIREMENTS:
 
 COMPOSITION:
 Create the image specifically for a landscape presentation image card.
-Keep the important subject away from extreme edges so the image can be safely cropped to fill the PowerPoint card without cutting off the main subject.`
-
+Keep the important subject away from extreme edges so the image can be safely cropped to fill the PowerPoint card without cutting off the main subject.`,
 
 
           })
-
 
 
         }
@@ -216,15 +205,9 @@ Keep the important subject away from extreme edges so the image can be safely cr
 
 
 
-
-
-
     const data =
 
       await response.json();
-
-
-
 
 
 
@@ -253,9 +236,6 @@ Keep the important subject away from extreme edges so the image can be safely cr
 
 
 
-
-
-
     return {
 
 
@@ -264,11 +244,9 @@ Keep the important subject away from extreme edges so the image can be safely cr
         "image",
 
 
-
       format:
 
         "base64",
-
 
 
       data:
@@ -279,12 +257,9 @@ Keep the important subject away from extreme edges so the image can be safely cr
     };
 
 
-
-
   }
 
   catch(error){
-
 
 
     console.error(
@@ -296,15 +271,357 @@ Keep the important subject away from extreme edges so the image can be safely cr
     );
 
 
-
     return null;
-
 
 
   }
 
 
 }
+
+
+// ======================================================
+// PEXELS VISUAL GENERATOR
+//
+// Used by PPT export only when:
+// generateSlideVisual({ visualType:"image", source:"pexels" })
+//
+// This calls the existing Pexels backend pipeline at
+// /api/notes-image. That backend reads PEXELS_API_KEY from
+// the server environment and downloads the selected Pexels
+// image as a data URL.
+// ======================================================
+
+
+async function generatePexelsVisual(
+
+  prompt
+
+){
+
+
+  try {
+
+
+    const query =
+
+      buildPexelsSearchQuery(
+
+        prompt
+
+      );
+
+
+    const response =
+
+      await fetch(
+
+        PEXELS_IMAGE_API_URL,
+
+        {
+
+          method:"POST",
+
+          headers:{
+
+            "Content-Type":
+
+              "application/json",
+
+          },
+
+          body:JSON.stringify({
+
+            topic:
+
+              query,
+
+          }),
+
+        }
+
+      );
+
+
+    let data = null;
+
+
+    try {
+
+      data =
+
+        await response.json();
+
+
+    }
+
+    catch {
+
+      data = null;
+
+    }
+
+
+    if(
+
+      !response.ok ||
+
+      !data?.success
+
+    ){
+
+      throw new Error(
+
+        data?.message ||
+
+        `Pexels image request failed (${response.status}).`
+
+      );
+
+    }
+
+
+    const imageResult =
+
+      data?.image ||
+
+      data?.images?.[0] ||
+
+      null;
+
+
+    const imageData =
+
+      typeof imageResult === "string"
+
+        ? imageResult
+
+        : imageResult?.imageUrl ||
+
+          imageResult?.image ||
+
+          "";
+
+
+    if(!imageData){
+
+      throw new Error(
+
+        "Pexels response did not contain image data."
+
+      );
+
+    }
+
+
+    return {
+
+      type:
+
+        "image",
+
+      format:
+
+        "base64",
+
+      data:
+
+        imageData,
+
+      source:
+
+        "pexels",
+
+      metadata:
+
+        typeof imageResult === "object"
+
+          ? {
+
+              topic:
+
+                imageResult.topic ||
+
+                query,
+
+              alt:
+
+                imageResult.alt ||
+
+                "",
+
+              photographer:
+
+                imageResult.photographer ||
+
+                "",
+
+              photographerUrl:
+
+                imageResult.photographerUrl ||
+
+                "",
+
+              photoUrl:
+
+                imageResult.photoUrl ||
+
+                "",
+
+              width:
+
+                Number(
+
+                  imageResult.width
+
+                ) || 0,
+
+              height:
+
+                Number(
+
+                  imageResult.height
+
+                ) || 0,
+
+            }
+
+          : null,
+
+    };
+
+
+  }
+
+  catch(error){
+
+
+    console.error(
+
+      "Pexels visual generation failed:",
+
+      error
+
+    );
+
+
+    return null;
+
+
+  }
+
+
+}
+
+
+// ======================================================
+// PEXELS SEARCH QUERY CLEANER
+//
+// Removes presentation-generation instructions that are
+// useful for AI image generation but harmful as Pexels search
+// keywords. The topic itself is retained.
+// ======================================================
+
+
+function buildPexelsSearchQuery(
+
+  prompt
+
+){
+
+
+  const value =
+
+    String(prompt || "")
+
+      .trim();
+
+
+  if(!value){
+
+    return "professional presentation topic";
+
+  }
+
+
+  return value
+
+    .replace(
+
+      /Create a high-resolution premium presentation photograph for this topic:/gi,
+
+      ""
+
+    )
+
+    .replace(
+
+      /Create one premium presentation visual\.?/gi,
+
+      ""
+
+    )
+
+    .replace(
+
+      /IMAGE REQUIREMENTS:[\s\S]*?(?=COMPOSITION:|$)/gi,
+
+      ""
+
+    )
+
+    .replace(
+
+      /Requirements:[\s\S]*?(?=Image framing:|Do NOT include:|$)/gi,
+
+      ""
+
+    )
+
+    .replace(
+
+      /Image framing:[\s\S]*?(?=Do NOT include:|$)/gi,
+
+      ""
+
+    )
+
+    .replace(
+
+      /Do NOT include:[\s\S]*$/gi,
+
+      ""
+
+    )
+
+    .replace(
+
+      /COMPOSITION:[\s\S]*$/gi,
+
+      ""
+
+    )
+
+    .replace(/\s+/g, " ")
+
+    .replace(/[^a-zA-Z0-9,.:&+\- ]/g, " ")
+
+    .trim()
+
+    .slice(
+
+      0,
+
+      180
+
+    ) ||
+
+    "professional presentation topic";
+
+
+}
+
+
 // ======================================================
 // ICON VISUAL GENERATOR
 //
@@ -326,7 +643,6 @@ function generateIconVisual(
 ){
 
 
-
   return {
 
 
@@ -335,18 +651,14 @@ function generateIconVisual(
       "image",
 
 
-
     format:
 
       "svg",
 
 
-
     data:
 
-
-
-`
+` 
 
 <svg
 
@@ -396,7 +708,6 @@ offset="100%"
 stop-color="#38BDF8"
 
 />
-
 
 </linearGradient>
 
@@ -464,7 +775,6 @@ text-anchor="middle"
 
 
 
-
 <text
 
 x="300"
@@ -491,8 +801,6 @@ shortenText(prompt)
 
 
 
-
-
 </svg>
 
 `
@@ -501,13 +809,6 @@ shortenText(prompt)
 
 
 }
-
-
-
-
-
-
-
 
 
 // ======================================================
@@ -528,16 +829,9 @@ function generateDiagramVisual(
 ){
 
 
-
   const steps =
 
-
     diagram?.steps || [];
-
-
-
-
-
 
 
   return {
@@ -548,18 +842,14 @@ function generateDiagramVisual(
       "image",
 
 
-
     format:
 
       "svg",
 
 
-
     data:
 
-
-
-`
+` 
 
 <svg
 
@@ -610,7 +900,6 @@ stop-color="#38BDF8"
 
 />
 
-
 </linearGradient>
 
 
@@ -621,6 +910,7 @@ stop-color="#38BDF8"
 
 
 ${
+
 steps.map(
 
 (step,index)=>`
@@ -672,8 +962,8 @@ ${escapeXML(step)}
 
 
 
-
 ${
+
 index < steps.length - 1
 
 ?
@@ -726,6 +1016,8 @@ text-anchor="middle"
 
 
 }
+
+
 // ======================================================
 // HELPERS
 // ======================================================
@@ -740,7 +1032,6 @@ function shortenText(
 ){
 
 
-
   if(!text){
 
     return "";
@@ -748,11 +1039,9 @@ function shortenText(
   }
 
 
-
   const value =
 
     String(text);
-
 
 
   if(
@@ -764,7 +1053,6 @@ function shortenText(
     return value;
 
   }
-
 
 
   return (
@@ -791,15 +1079,11 @@ function shortenText(
 
 
 
-
-
-
 function escapeXML(
 
   value
 
 ){
-
 
 
   return String(
@@ -856,13 +1140,10 @@ function escapeXML(
 
 
 
-
-
-
 // ======================================================
 // IMAGE FORMAT CONVERTER
 //
-// Makes Gemini response compatible
+// Makes Gemini/Pexels response compatible
 // with pptx.addImage()
 //
 // ======================================================
@@ -875,15 +1156,11 @@ export function prepareVisualForPpt(
 ){
 
 
-
   if(!visual){
 
     return null;
 
   }
-
-
-
 
 
 
@@ -910,11 +1187,7 @@ export function prepareVisualForPpt(
     };
 
 
-
   }
-
-
-
 
 
 
@@ -945,11 +1218,7 @@ export function prepareVisualForPpt(
     };
 
 
-
   }
-
-
-
 
 
 
@@ -958,9 +1227,6 @@ export function prepareVisualForPpt(
 
 
 }
-
-
-
 
 
 
@@ -977,7 +1243,6 @@ function svgToDataUri(
   svg
 
 ){
-
 
 
   return (
@@ -1002,10 +1267,12 @@ function svgToDataUri(
 
 
 }
+
+
 // ======================================================
 // DEFAULT VISUAL FALLBACK
 //
-// Keeps PPT stable if Gemini fails.
+// Keeps PPT stable if Image Studio or Pexels fails.
 //
 // IMPORTANT:
 // No fake AI Visual Concept card.
@@ -1019,9 +1286,6 @@ export function fallbackVisual(){
   return null;
 
 }
-
-
-
 
 
 
@@ -1058,9 +1322,6 @@ export function isVisualAvailable(
 
 
 
-
-
-
 // ======================================================
 // VISUAL TYPE NORMALIZER
 //
@@ -1075,9 +1336,7 @@ export function normalizeVisualType(
 ){
 
 
-
   switch(type){
-
 
 
     case "hero":
@@ -1109,14 +1368,10 @@ export function normalizeVisualType(
       return "image";
 
 
-
   }
 
 
 }
-
-
-
 
 
 
@@ -1128,7 +1383,8 @@ export function normalizeVisualType(
 //
 // Features:
 //
-// ✓ Gemini image generation ready
+// ✓ Existing Image Studio generation path preserved
+// ✓ Pexels PPT path added
 // ✓ Real cinematic visuals
 // ✓ SVG diagrams
 // ✓ SVG icons

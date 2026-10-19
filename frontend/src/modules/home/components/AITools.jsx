@@ -34,6 +34,14 @@ export default function AITools() {
     },
 
     {
+      title: "Image Studio",
+      description: "Generate and refine AI images",
+      icon: Sparkles,
+      path: "/image-studio",
+      accent: "fuchsia",
+    },
+
+    {
       title: "Notes Generator",
       description: "Create structured notes",
       icon: FileText,

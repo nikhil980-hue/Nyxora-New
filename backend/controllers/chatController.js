@@ -10,6 +10,9 @@ import {
 import {
   extractMemory,
 } from "../services/memoryExtractor.js";
+import { runNyxoraAgent } from "../services/agentOrchestrator.js";
+import { analyzeJarvisCommand } from "../services/jarvisCommandService.js";
+import { streamNyxoraModel } from "../services/modelGateway.js";
 
 
 // ======================================================
@@ -36,6 +39,73 @@ function normalizeRecentMessage(
       " "
     )
     .toLowerCase();
+
+}
+
+
+// ======================================================
+// CHECK LONG-TERM MEMORY CANDIDATE
+//
+// Avoid calling a cloud LLM for ordinary questions.
+// Only messages that contain a reasonable signal of a
+// durable personal fact, preference, instruction, or
+// explicit memory request are sent to extractMemory().
+// ======================================================
+
+function shouldConsiderForLongTermMemory(
+  message
+) {
+
+  const text = String(
+    message ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!text) {
+    return false;
+  }
+
+  const explicitMemorySignals = [
+    "remember that",
+    "remember this",
+    "don't forget",
+    "do not forget",
+    "keep this in mind",
+    "save this",
+    "store this",
+    "from now on",
+    "going forward",
+  ];
+
+  if (
+    explicitMemorySignals.some(
+      (signal) =>
+        text.includes(signal)
+    )
+  ) {
+
+    return true;
+
+  }
+
+
+  const personalMemorySignals = [
+    /\bmy\s+(name|course|college|school|university|team|role|job|work|skills?|hobbies?|interests?|preferences?|favorite|favourite|goals?|projects?)\b/i,
+
+    /\bi\s+(am|\'m|study|work|live|like|love|prefer|hate|dislike|enjoy|use|have|own)\b/i,
+
+    /\bi\s+(always|usually|often|never)\b/i,
+
+    /\bcall me\b/i,
+  ];
+
+
+  return personalMemorySignals.some(
+    (signal) =>
+      signal.test(text)
+  );
 
 }
 
@@ -349,27 +419,29 @@ export async function chatWithAI(
 
   try {
 
-const {
-  message,
+    const {
+      message,
 
-  memoryMessage,
+      memoryMessage,
 
-  attachment,
+      attachment,
 
-  // New multiple attachment support.
-  attachments,
+      // New multiple attachment support.
+      attachments,
 
-  // Keep legacy image support while the frontend
-  // migration is completed.
-  image,
+      // Keep legacy image support while the frontend
+      // migration is completed.
+      image,
 
-  history,
+      history,
 
-  userId,
+      userId,
 
-  mode,
+      mode,
 
-} = req.body;
+      jarvisMode = false,
+
+    } = req.body;
 
 
     // ==================================================
@@ -398,35 +470,35 @@ const {
     // Fall back to the old image field if necessary.
     // ==================================================
 
-const safeAttachments =
-  Array.isArray(
-    attachments
-  )
+    const safeAttachments =
+      Array.isArray(
+        attachments
+      )
 
-    ? attachments
-        .map(
-          (
-            item
-          ) =>
-            normalizeAttachment(
-              item
+        ? attachments
+            .map(
+              (
+                item
+              ) =>
+                normalizeAttachment(
+                  item
+                )
             )
-        )
-        .filter(
-          Boolean
-        )
+            .filter(
+              Boolean
+            )
 
-    : [];
+        : [];
 
 
-const safeAttachment =
-  safeAttachments[0] ||
-  normalizeAttachment(
-    attachment
-  ) ||
-  normalizeLegacyImage(
-    image
-  );
+    const safeAttachment =
+      safeAttachments[0] ||
+      normalizeAttachment(
+        attachment
+      ) ||
+      normalizeLegacyImage(
+        image
+      );
 
 
     // ==================================================
@@ -439,11 +511,11 @@ const safeAttachment =
       message.trim() !== "";
 
 
-if (
-  !hasMessage &&
-  safeAttachments.length === 0 &&
-  !safeAttachment
-) {
+    if (
+      !hasMessage &&
+      safeAttachments.length === 0 &&
+      !safeAttachment
+    ) {
 
       return res
         .status(400)
@@ -485,16 +557,17 @@ if (
 
     }
 
+
     if (
-  safeAttachments.length > 0
-) {
+      safeAttachments.length > 0
+    ) {
 
-  console.log(
-    "📎 AI attachments:",
-    safeAttachments.length
-  );
+      console.log(
+        "📎 AI attachments:",
+        safeAttachments.length
+      );
 
-}
+    }
 
 
     // ==================================================
@@ -537,88 +610,228 @@ if (
 
 
     // ==================================================
-    // STEP 2 — EXTRACT LONG-TERM MEMORY
+    // STEPS 48-53 — JARVIS COMMAND EXECUTION
+    // ==================================================
+
+    const jarvisCommand = analyzeJarvisCommand(
+      cleanMemoryMessage,
+      { forceJarvis: Boolean(jarvisMode) }
+    );
+
+    if (jarvisCommand.isJarvisCommand) {
+      const authenticatedUserId = req.nyxoraUser?.uid || null;
+      const localRequest =
+        req.ip === "127.0.0.1" ||
+        req.ip === "::1" ||
+        String(req.hostname || "").toLowerCase() === "localhost";
+      const jarvisEnabled = String(process.env.NYXORA_JARVIS_ENABLED || "true").toLowerCase() === "true";
+
+      if (!jarvisEnabled) {
+        return res.status(403).json({
+          success: false,
+          reply: "Nyxora JARVIS control is disabled. Set NYXORA_JARVIS_ENABLED=true on the local Nyxora machine.",
+        });
+      }
+
+      if (!authenticatedUserId && !localRequest) {
+        return res.status(401).json({
+          success: false,
+          reply: "JARVIS computer control requires an authenticated local request.",
+        });
+      }
+
+      console.log(
+        `[Nyxora JARVIS] COMMAND -> task=${jarvisCommand.task} | tools=${jarvisCommand.selectedTools.join(",") || "none"} | confirmation=${jarvisCommand.confirmationProvided}`
+      );
+
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.setHeader("Transfer-Encoding", "chunked");
+      res.setHeader("Cache-Control", "no-cache");
+
+      const agentMessages = Array.isArray(history)
+        ? history.slice(-10).map((item) => ({
+            role: item?.role === "assistant" ? "assistant" : "user",
+            content: String(item?.content || item?.message || ""),
+          })).filter((item) => item.content.trim())
+        : [];
+
+      const modelResponder = async function* ({ messages: agentMessagesInput = [], prompt: agentPrompt = "", attachments = [], mode: agentMode = null, task = "reasoning", timeoutOverrideMs } = {}) {
+        try {
+          for await (const delta of streamNyxoraModel({
+            messages: agentMessagesInput,
+            prompt: agentPrompt,
+            mode: agentMode,
+            attachments: Array.isArray(attachments) ? attachments : [],
+            timeoutOverrideMs,
+          })) {
+            yield delta;
+          }
+          return;
+        } catch (gatewayError) {
+          console.warn(`[Nyxora JARVIS] Model Gateway fallback -> ${gatewayError?.message || gatewayError}`);
+        }
+
+        for await (const delta of generateAIResponseStream(
+          agentPrompt || cleanMemoryMessage,
+          null,
+          [],
+          agentMessagesInput,
+          userMemory,
+          agentMode
+        )) {
+          yield delta;
+        }
+      };
+
+      try {
+        let jarvisResponse = "";
+
+        for await (const chunk of runNyxoraAgent({
+          messages: agentMessages,
+          prompt: cleanMemoryMessage,
+          mode,
+          taskAnalysis: jarvisCommand,
+          modelResponder,
+          userId: authenticatedUserId || userId || null,
+          agentMemory: userMemory,
+          jarvisCommand,
+        })) {
+          jarvisResponse += String(chunk || "");
+          res.write(String(chunk || ""));
+        }
+
+        res.end();
+
+        if (userId && cleanMemoryMessage && jarvisResponse.trim()) {
+          try {
+            const latestMemory = await getMemory(userId);
+            const recentMessages = buildRecentMessages(
+              latestMemory?.recentMessages || [],
+              cleanMemoryMessage,
+              jarvisResponse.trim()
+            );
+            await saveMemory(userId, { recentMessages });
+          } catch (memoryError) {
+            console.warn("⚠️ Failed to save JARVIS recent context:", memoryError?.message || memoryError);
+          }
+        }
+
+        return;
+      } catch (agentError) {
+        console.error("❌ Nyxora JARVIS Error:", agentError);
+        if (!res.headersSent) {
+          return res.status(500).json({
+            success: false,
+            reply: "Nyxora could not safely complete that computer task.",
+          });
+        }
+        try { res.end(); } catch {}
+        return;
+      }
+    }
+
+    // ==================================================
+    // STEP 2 — EXTRACT LONG-TERM MEMORY (BACKGROUND)
     //
     // IMPORTANT:
-    // Only cleanMemoryMessage is analyzed.
+    // Only messages that look like possible durable
+    // personal information are sent to the cloud
+    // memory extractor.
     //
-    // Extracted PDF text and visual PDF content must NOT
-    // automatically become long-term user memory.
+    // Ordinary questions such as:
+    // "What is the capital of Japan?"
+    // do NOT trigger Gemini memory extraction.
+    //
+    // IMPORTANT PERFORMANCE CHANGE:
+    // Memory extraction is intentionally NOT awaited here.
+    // Gemini memory extraction can take several seconds or
+    // hit 429/503 responses. It must never block Nyxora
+    // from starting the main AI response stream.
     // ==================================================
 
     if (
       userId &&
-      cleanMemoryMessage
+      cleanMemoryMessage &&
+      shouldConsiderForLongTermMemory(
+        cleanMemoryMessage
+      )
     ) {
 
-      try {
-
-        const extractedMemory =
-          await extractMemory(
-
-            cleanMemoryMessage,
-
-            userMemory
-
-          );
+      const memoryUserId =
+        userId;
 
 
-        if (
-          extractedMemory &&
-          Object.keys(
-            extractedMemory
-          ).length > 0
-        ) {
+      const memoryMessage =
+        cleanMemoryMessage;
 
-          await saveMemory(
 
-            userId,
+      // Snapshot the memory used for this extraction so
+      // later requests cannot mutate the context underneath it.
+      const memorySnapshot =
+        userMemory
+          ? JSON.parse(
+              JSON.stringify(
+                userMemory
+              )
+            )
+          : null;
 
-            extractedMemory
 
-          );
+      void (async () => {
 
+        try {
 
           console.log(
-            "✅ Smart memory changes saved."
+            "🧠 Background memory extraction started."
           );
 
 
-          // ============================================
-          // RELOAD FRESH MEMORY
-          // ============================================
-
-          userMemory =
-            await getMemory(
-              userId
+          const extractedMemory =
+            await extractMemory(
+              memoryMessage,
+              memorySnapshot
             );
 
 
-          console.log(
-            "🔄 Updated memory reloaded:",
-            userMemory
+          if (
+            extractedMemory &&
+            Object.keys(
+              extractedMemory
+            ).length > 0
+          ) {
+
+            await saveMemory(
+              memoryUserId,
+              extractedMemory
+            );
+
+
+            console.log(
+              "✅ Smart memory changes saved in background."
+            );
+
+          } else {
+
+            console.log(
+              "🧠 No long-term memory update required."
+            );
+
+          }
+
+        } catch (error) {
+
+          console.error(
+            "⚠️ Background memory processing failed:",
+            error?.message || error
           );
 
-        } else {
 
-          console.log(
-            "🧠 No long-term memory update required."
-          );
+          // Memory failure must never prevent
+          // the AI response.
 
         }
 
-      } catch (error) {
-
-        console.error(
-          "⚠️ Memory processing failed:",
-          error
-        );
-
-
-        // Memory failure must never prevent
-        // the AI response.
-
-      }
+      })();
 
     }
 
@@ -649,27 +862,27 @@ if (
     );
 
 
-for await (
-  const chunk of
-    generateAIResponseStream(
+    for await (
+      const chunk of
+        generateAIResponseStream(
 
-      message ||
-        "Analyze the attached file.",
+          message ||
+            "Analyze the attached file.",
 
-      safeAttachment,
+          safeAttachment,
 
-      safeAttachments,
+          safeAttachments,
 
-      Array.isArray(history)
-        ? history
-        : [],
+          Array.isArray(history)
+            ? history
+            : [],
 
-      userMemory,
+          userMemory,
 
-      mode
+          mode
 
-    )
-) {
+        )
+    ) {
 
       fullResponse +=
         chunk;

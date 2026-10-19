@@ -4,34 +4,36 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const projectId = process.env.FIREBASE_PROJECT_ID;
+const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
-const serviceAccount = {
+if (!projectId || !clientEmail || !privateKey) {
+  console.error("\n[Nyxora Firebase] Missing Firebase environment variables.");
 
-  projectId:
-    process.env.FIREBASE_PROJECT_ID,
+  console.error(
+    "[Nyxora Firebase] Required:"
+  );
 
-  clientEmail:
-    process.env.FIREBASE_CLIENT_EMAIL,
+  console.error("  FIREBASE_PROJECT_ID");
+  console.error("  FIREBASE_CLIENT_EMAIL");
+  console.error("  FIREBASE_PRIVATE_KEY");
 
-  privateKey:
-    process.env.FIREBASE_PRIVATE_KEY
-      ?.replace(/\\n/g, "\n"),
-
-};
-
-
-
-if (getApps().length === 0) {
-
-  initializeApp({
-
-    credential:
-      cert(serviceAccount),
-
-  });
-
+  throw new Error(
+    "Firebase Admin configuration is incomplete. Check FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in backend/.env."
+  );
 }
 
+const serviceAccount = {
+  projectId,
+  clientEmail,
+  privateKey,
+};
 
-export const db =
-  getFirestore();
+if (getApps().length === 0) {
+  initializeApp({
+    credential: cert(serviceAccount),
+  });
+}
+
+export const db = getFirestore();

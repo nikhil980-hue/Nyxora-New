@@ -14,29 +14,85 @@ import {
 
 import { db, auth } from "../firebase/firebase";
 
-function chatsCollection() {
+const CHAT_SCOPE = "chat";
+const IMAGE_STUDIO_SCOPE = "imageStudio";
+
+function getCollectionName(scope = CHAT_SCOPE) {
+  return scope === IMAGE_STUDIO_SCOPE
+    ? "imageStudioChats"
+    : "chats";
+}
+
+function chatsCollection(scope = CHAT_SCOPE) {
   const uid = auth.currentUser?.uid;
 
   if (!uid) {
     throw new Error("User not authenticated.");
   }
 
-  return collection(db, "users", uid, "chats");
+  return collection(
+    db,
+    "users",
+    uid,
+    getCollectionName(scope)
+  );
 }
 
-export async function createChat(title = "New Chat") {
-  const ref = await addDoc(chatsCollection(), {
-    title,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+function chatDocumentRef(chatId, scope = CHAT_SCOPE) {
+  const uid = auth.currentUser?.uid;
+
+  if (!uid) {
+    throw new Error("User not authenticated.");
+  }
+
+  return doc(
+    db,
+    "users",
+    uid,
+    getCollectionName(scope),
+    chatId
+  );
+}
+
+function messagesDocumentRef(chatId, scope = CHAT_SCOPE) {
+  const uid = auth.currentUser?.uid;
+
+  if (!uid) {
+    throw new Error("User not authenticated.");
+  }
+
+  return doc(
+    db,
+    "users",
+    uid,
+    getCollectionName(scope),
+    chatId,
+    "data",
+    "messages"
+  );
+}
+
+export async function createChat(
+  title = "New Chat",
+  scope = CHAT_SCOPE
+) {
+  const ref = await addDoc(
+    chatsCollection(scope),
+    {
+      title,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }
+  );
 
   return ref.id;
 }
 
-export async function getChats() {
+export async function getChats(
+  scope = CHAT_SCOPE
+) {
   const q = query(
-    chatsCollection(),
+    chatsCollection(scope),
     orderBy("updatedAt", "desc")
   );
 
@@ -48,11 +104,13 @@ export async function getChats() {
   }));
 }
 
-export async function saveMessages(chatId, messages) {
-  const uid = auth.currentUser.uid;
-
+export async function saveMessages(
+  chatId,
+  messages,
+  scope = CHAT_SCOPE
+) {
   await setDoc(
-    doc(db, "users", uid, "chats", chatId),
+    chatDocumentRef(chatId, scope),
     {
       updatedAt: serverTimestamp(),
     },
@@ -60,34 +118,19 @@ export async function saveMessages(chatId, messages) {
   );
 
   await setDoc(
-    doc(
-      db,
-      "users",
-      uid,
-      "chats",
-      chatId,
-      "data",
-      "messages"
-    ),
+    messagesDocumentRef(chatId, scope),
     {
       messages,
     }
   );
 }
 
-export async function loadMessages(chatId) {
-  const uid = auth.currentUser.uid;
-
+export async function loadMessages(
+  chatId,
+  scope = CHAT_SCOPE
+) {
   const snapshot = await getDoc(
-    doc(
-      db,
-      "users",
-      uid,
-      "chats",
-      chatId,
-      "data",
-      "messages"
-    )
+    messagesDocumentRef(chatId, scope)
   );
 
   if (!snapshot.exists()) {
@@ -97,11 +140,13 @@ export async function loadMessages(chatId) {
   return snapshot.data().messages || [];
 }
 
-export async function renameChat(chatId, title) {
-  const uid = auth.currentUser.uid;
-
+export async function renameChat(
+  chatId,
+  title,
+  scope = CHAT_SCOPE
+) {
   await updateDoc(
-    doc(db, "users", uid, "chats", chatId),
+    chatDocumentRef(chatId, scope),
     {
       title,
       updatedAt: serverTimestamp(),
@@ -109,11 +154,13 @@ export async function renameChat(chatId, title) {
   );
 }
 
-export async function updateChatTitle(chatId, title) {
-  const uid = auth.currentUser.uid;
-
+export async function updateChatTitle(
+  chatId,
+  title,
+  scope = CHAT_SCOPE
+) {
   await updateDoc(
-    doc(db, "users", uid, "chats", chatId),
+    chatDocumentRef(chatId, scope),
     {
       title,
       updatedAt: serverTimestamp(),
@@ -121,10 +168,29 @@ export async function updateChatTitle(chatId, title) {
   );
 }
 
-export async function deleteChat(chatId) {
-  const uid = auth.currentUser.uid;
+export async function deleteChat(
+  chatId,
+  scope = CHAT_SCOPE
+) {
+  if (!chatId) {
+    throw new Error("Chat ID is required.");
+  }
+
+  // Firestore does not automatically delete nested documents.
+  // Delete the message document before deleting the parent chat.
+  try {
+    await deleteDoc(
+      messagesDocumentRef(chatId, scope)
+    );
+  } catch (error) {
+    // A missing messages document should not prevent deletion
+    // of the parent chat document.
+    if (error?.code !== "not-found") {
+      throw error;
+    }
+  }
 
   await deleteDoc(
-    doc(db, "users", uid, "chats", chatId)
+    chatDocumentRef(chatId, scope)
   );
 }

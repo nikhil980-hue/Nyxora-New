@@ -26,6 +26,10 @@ import {
 } from "../services/presentationService";
 
 
+import presentationThemes
+  from "../utils/presentationThemes";
+
+
 import {
   exportPresentationToPpt,
 } from "../services/pptExportService";
@@ -91,11 +95,15 @@ export default function Presentation() {
 
 
   // ====================================================
-  // FIXED INTERNAL THEME
+  // PRESENTATION THEME
   // ====================================================
 
-  const DEFAULT_PRESENTATION_THEME =
-    "nyxoraPremium";
+  const [
+    selectedTheme,
+    setSelectedTheme,
+  ] = useState("nyxoraPremium");
+
+
 
 
   useEffect(() => {
@@ -145,6 +153,12 @@ export default function Presentation() {
         setSlides(
           saved.slides ||
           []
+        );
+
+
+        setSelectedTheme(
+          saved.theme ||
+          "nyxoraPremium"
         );
 
       }
@@ -197,7 +211,7 @@ export default function Presentation() {
             data.slideCount,
 
           theme:
-            DEFAULT_PRESENTATION_THEME,
+            selectedTheme,
 
           customPrompt:
             data.customPrompt,
@@ -265,7 +279,7 @@ export default function Presentation() {
               generatedSlides,
 
             theme:
-              DEFAULT_PRESENTATION_THEME,
+              selectedTheme,
 
           });
 
@@ -338,7 +352,7 @@ export default function Presentation() {
 
 
         themeName:
-          DEFAULT_PRESENTATION_THEME,
+          selectedTheme,
 
       });
 
@@ -555,6 +569,89 @@ export default function Presentation() {
 
         </div>
 
+
+
+        {/* =============================================
+            PRESENTATION THEME
+        ============================================== */}
+
+        <div
+          className="
+            mb-6
+            flex
+            flex-wrap
+            items-center
+            justify-between
+            gap-4
+            rounded-2xl
+            border
+            border-violet-400/20
+            bg-[#0B1020]/90
+            p-4
+          "
+        >
+
+          <div>
+            <p
+              className="
+                text-[10px]
+                font-semibold
+                uppercase
+                tracking-[0.18em]
+                text-violet-300
+              "
+            >
+              Presentation Style
+            </p>
+
+            <p
+              className="
+                mt-1
+                text-sm
+                text-slate-400
+              "
+            >
+              Choose the visual theme used for PPTX export.
+            </p>
+          </div>
+
+          <select
+            value={selectedTheme}
+            onChange={(event) =>
+              setSelectedTheme(event.target.value)
+            }
+            disabled={loading || exporting}
+            className="
+              min-w-[220px]
+              rounded-xl
+              border
+              border-violet-400/25
+              bg-[#050816]
+              px-4
+              py-2.5
+              text-sm
+              font-medium
+              text-white
+              outline-none
+              transition
+              focus:border-violet-400/60
+              disabled:cursor-not-allowed
+              disabled:opacity-60
+            "
+          >
+            {Object.entries(presentationThemes).map(
+              ([themeId, theme]) => (
+                <option
+                  key={themeId}
+                  value={themeId}
+                >
+                  {theme.name || themeId}
+                </option>
+              )
+            )}
+          </select>
+
+        </div>
 
 
         {/* =============================================

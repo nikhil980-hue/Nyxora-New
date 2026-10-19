@@ -1,148 +1,3561 @@
+// ======================================================
+
+
+
+
+
+
+
+// NYXORA AI PRESENTATION LAYOUT ENGINE
+
+
+
+
+
+
+
+//
+
+
+
+
+
+
+
+// Premium slide layout definitions.
+
+
+
+
+
+
+
+//
+
+
+
+
+
+
+
+// IMPORTANT:
+
+
+
+
+
+
+
+// - Existing layouts are preserved.
+
+
+
+
+
+
+
+// - New layouts are additive.
+
+
+
+
+
+
+
+// - Layout "type" values are consumed by the PPT exporter.
+
+
+
+
+
+
+
+// - Unknown layouts safely fall back to "content".
+
+
+
+
+
+
+
+// ======================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const presentationLayouts = {
 
 
-  title: {
 
 
-    name:
-      "Premium Hero",
 
 
-    description:
-      "Clean title slide with large typography and minimal branding",
 
 
-    type:
-      "title",
 
 
-  },
 
 
 
 
 
-  content: {
+  // ====================================================
 
 
-    name:
-      "Editorial Content",
 
 
-    description:
-      "Minimal text layout with strong hierarchy and optional visual",
 
 
-    type:
-      "content",
 
+  // EXISTING — TITLE
 
-  },
 
 
 
 
 
-  imageText: {
 
+  // ====================================================
 
-    name:
-      "Visual Story",
 
 
-    description:
-      "Split composition with explanation and supporting visual",
 
 
-    type:
-      "imageText",
 
 
-  },
 
 
 
 
 
-  diagram: {
 
 
-    name:
-      "Process Flow",
 
+  title: {
 
-    description:
-      "Clean step-by-step process visualization",
 
 
-    type:
-      "diagram",
 
 
-  },
 
 
 
 
 
-  comparison: {
 
 
-    name:
-      "Comparison View",
 
 
-    description:
-      "Balanced comparison between two concepts",
 
+    name:
 
-    type:
-      "comparison",
 
 
-  },
 
 
 
 
+      "Premium Hero",
 
-  timeline: {
 
 
-    name:
-      "Timeline Story",
 
 
-    description:
-      "Sequential story progression layout",
 
 
-    type:
-      "timeline",
 
 
-  },
 
 
 
 
 
-  summary: {
 
+    description:
 
-    name:
-      "Key Takeaway",
 
 
-    description:
-      "Minimal closing slide with memorable message",
 
 
-    type:
-      "summary",
 
 
-  },
+      "Clean title slide with large typography and minimal branding",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "title",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — CINEMATIC HERO
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  hero: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Cinematic Hero",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Large cinematic opening composition with bold typography and supporting visual",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "hero",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // EXISTING — CONTENT
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  content: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Editorial Content",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Minimal text layout with strong hierarchy and optional visual",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "content",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — SECTION DIVIDER
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  sectionDivider: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Section Divider",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Minimal chapter-opening slide for major presentation sections",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "section-divider",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — TWO COLUMN
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  twoColumn: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Dual Column",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Balanced two-column composition for concepts, explanations and supporting content",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "two-column",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — THREE COLUMN
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  threeColumn: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Three Column",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Three balanced content zones for features, concepts or categories",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "three-column",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // EXISTING — IMAGE + TEXT
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  imageText: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Visual Story",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Split composition with explanation and supporting visual",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "imageText",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — FULL IMAGE
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  fullImage: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Full Visual",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Full-slide cinematic visual with controlled text overlay",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "full-image",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — QUOTE
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  quote: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Editorial Quote",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Large statement or quotation with premium editorial typography",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "quote",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — STAT CARDS
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  stats: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Impact Metrics",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Large numerical metrics presented through premium visual cards",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "stats",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — METRIC GRID
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  metricGrid: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Metric Grid",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Structured grid for multiple statistics, indicators or performance measures",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "metric-grid",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // EXISTING — DIAGRAM
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  diagram: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Process Flow",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Clean step-by-step process visualization",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "diagram",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — ARCHITECTURE
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  architecture: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "System Architecture",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Layered technical architecture with connected components",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "architecture",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — PROCESS
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  process: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Process Journey",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Visual sequence showing transformation from one stage to another",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "process",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // EXISTING — COMPARISON
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  comparison: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Comparison View",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Balanced comparison between two concepts",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "comparison",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — BEFORE / AFTER
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  beforeAfter: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Before & After",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Visual transformation between two states or approaches",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "before-after",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // EXISTING — TIMELINE
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  timeline: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Timeline Story",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Sequential story progression layout",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "timeline",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — CASE STUDY
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  caseStudy: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Case Study",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Structured problem, solution and outcome storytelling layout",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "case-study",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — TESTIMONIAL
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  testimonial: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Testimonial",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Premium testimonial composition with quote, person and supporting context",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "testimonial",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — CHART
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  chart: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Data Story",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Clean data visualization layout for charts, trends and insights",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "chart",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — TABLE
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  table: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Data Table",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Structured table layout for organized comparisons and datasets",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "table",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — KEY TAKEAWAY
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  keyTakeaway: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Key Takeaway",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "High-impact single-message slide highlighting the most important insight",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "key-takeaway",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // EXISTING — SUMMARY
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  summary: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Summary Slide",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Minimal closing slide with memorable message",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "summary",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+  // NEW — CLOSING
+
+
+
+
+
+
+
+  // ====================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  closing: {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    name:
+
+
+
+
+
+
+
+      "Premium Closing",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    description:
+
+
+
+
+
+
+
+      "Cinematic final slide with strong closing message and Nyxora branding",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    type:
+
+
+
+
+
+
+
+      "closing",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 };
@@ -155,26 +3568,250 @@ const presentationLayouts = {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ======================================================
+
+
+
+
+
+
+
+// GET PRESENTATION LAYOUT
+
+
+
+
+
+
+
+// ======================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export function getPresentationLayout(
 
-  layout
-
-){
 
 
-  return (
 
 
-    presentationLayouts[layout]
 
 
-    ||
 
 
-    presentationLayouts.content
 
 
-  );
+
+
+
+
+  layout
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  const normalizedLayout =
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    String(
+
+
+
+
+
+
+
+      layout || "content"
+
+
+
+
+
+
+
+    )
+
+
+
+
+
+
+
+      .trim()
+
+
+
+
+
+
+
+      .toLowerCase();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  return (
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    presentationLayouts[normalizedLayout]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ||
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    presentationLayouts.content
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  );
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 }
@@ -187,17 +3824,1091 @@ export function getPresentationLayout(
 
 
 
-export function getAvailableLayouts(){
 
 
-  return Object.keys(
 
-    presentationLayouts
 
-  );
+
+
+
+
+
+
+
+
+
+
+// ======================================================
+
+
+
+
+
+
+
+// GET AVAILABLE LAYOUTS
+
+
+
+
+
+
+
+// ======================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export function getAvailableLayouts() {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  return Object.keys(
+
+
+
+
+
+
+
+    presentationLayouts
+
+
+
+
+
+
+
+  );
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ======================================================
+
+
+
+
+
+
+
+// GET LAYOUTS BY CATEGORY
+
+
+
+
+
+
+
+// ======================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export function getLayoutsByCategory(
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  category
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  const categories = {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    opening: [
+
+
+
+
+
+
+
+      "title",
+
+
+
+
+
+
+
+      "hero",
+
+
+
+
+
+
+
+      "sectionDivider",
+
+
+
+
+
+
+
+    ],
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    content: [
+
+
+
+
+
+
+
+      "content",
+
+
+
+
+
+
+
+      "twoColumn",
+
+
+
+
+
+
+
+      "threeColumn",
+
+
+
+
+
+
+
+      "imageText",
+
+
+
+
+
+
+
+      "fullImage",
+
+
+
+
+
+
+
+      "quote",
+
+
+
+
+
+
+
+    ],
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    data: [
+
+
+
+
+
+
+
+      "stats",
+
+
+
+
+
+
+
+      "metricGrid",
+
+
+
+
+
+
+
+      "chart",
+
+
+
+
+
+
+
+      "table",
+
+
+
+
+
+
+
+    ],
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    visual: [
+
+
+
+
+
+
+
+      "diagram",
+
+
+
+
+
+
+
+      "architecture",
+
+
+
+
+
+
+
+      "process",
+
+
+
+
+
+
+
+      "timeline",
+
+
+
+
+
+
+
+    ],
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    storytelling: [
+
+
+
+
+
+
+
+      "comparison",
+
+
+
+
+
+
+
+      "beforeAfter",
+
+
+
+
+
+
+
+      "caseStudy",
+
+
+
+
+
+
+
+      "testimonial",
+
+
+
+
+
+
+
+    ],
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    closing: [
+
+
+
+
+
+
+
+      "keyTakeaway",
+
+
+
+
+
+
+
+      "summary",
+
+
+
+
+
+
+
+      "closing",
+
+
+
+
+
+
+
+    ],
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  const requestedLayouts =
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    categories[category];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  if (!requestedLayouts) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    return Object.entries(
+
+
+
+
+
+
+
+      presentationLayouts
+
+
+
+
+
+
+
+    );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  return requestedLayouts
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    .map(
+
+
+
+
+
+
+
+      key => [
+
+
+
+
+
+
+
+        key,
+
+
+
+
+
+
+
+        presentationLayouts[key],
+
+
+
+
+
+
+
+      ]
+
+
+
+
+
+
+
+    )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    .filter(
+
+
+
+
+
+
+
+      ([, layout]) =>
+
+
+
+
+
+
+
+        !!layout
+
+
+
+
+
+
+
+    );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ======================================================
+
+
+
+
+
+
+
+// CHECK LAYOUT SUPPORT
+
+
+
+
+
+
+
+// ======================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export function isPresentationLayoutSupported(
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  layout
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  const normalizedLayout =
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    String(
+
+
+
+
+
+
+
+      layout || ""
+
+
+
+
+
+
+
+    )
+
+
+
+
+
+
+
+      .trim()
+
+
+
+
+
+
+
+      .toLowerCase();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  return Object.prototype.hasOwnProperty.call(
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    presentationLayouts,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    normalizedLayout
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ======================================================
+
+
+
+
+
+
+
+// DEFAULT EXPORT
+
+
+
+
+
+
+
+// ======================================================
+
+
+
+
+
+
 
 
 

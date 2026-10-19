@@ -1,4 +1,6 @@
-export default function ThinkingIndicator() {
+export default function ThinkingIndicator({
+  text = "Nyxora AI is thinking...",
+}) {
   return (
     <div className="flex items-center gap-2">
       <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400"></span>
@@ -18,7 +20,7 @@ export default function ThinkingIndicator() {
       ></span>
 
       <span className="ml-3 text-sm text-gray-400">
-        Nyxora AI is thinking...
+        {text}
       </span>
     </div>
   );

@@ -6,20 +6,28 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "evaluate:agent": "node evaluation/runAgentEvaluation.js"
   },
   "keywords": [],
   "author": "Nyxora AI",
   "license": "ISC",
   "dependencies": {
     "@google/genai": "^2.13.0",
+    "@nut-tree-fork/nut-js": "^4.2.6",
     "axios": "^1.11.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "firebase": "^12.17.0",
     "firebase-admin": "^14.2.0",
-    "openai": "^7.0.0"
+    "jszip": "^3.10.2",
+    "mammoth": "^1.12.3",
+    "openai": "^7.0.0",
+    "pdf-parse": "^2.4.5",
+    "playwright": "^1.55.0",
+    "screenshot-desktop": "^1.15.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

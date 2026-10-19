@@ -196,22 +196,78 @@ function getMimeType(
 // ======================================================
 // CHECK SUPPORTED AI ATTACHMENT
 //
-// TXT / MD / DOCX are still handled through text
-// extraction in useChat.js.
+// The backend owns document parsing and multimodal routing.
+// Keep the original file available for every supported
+// document type instead of limiting the frontend transport
+// to PDF/image only.
 //
-// Images and PDFs are sent directly to Gemini.
+// The backend Document Intelligence service can then decide
+// whether the file needs text extraction, visual inspection,
+// or both.
 // ======================================================
 
+const DIRECT_DOCUMENT_EXTENSIONS =
+  new Set([
+    "pdf",
+    "doc",
+    "docx",
+    "xls",
+    "xlsx",
+    "csv",
+    "tsv",
+    "ppt",
+    "pptx",
+    "odt",
+    "ods",
+    "odp",
+    "rtf",
+    "md",
+    "txt",
+    "html",
+    "htm",
+    "xml",
+    "json",
+    "yaml",
+    "yml",
+    "log",
+    "env",
+    "ini",
+    "conf",
+    "zip",
+  ]);
+
 function isSupportedAIAttachment(
-  mimeType
+  mimeType,
+  extension = ""
 ) {
 
+  const normalizedMimeType =
+    String(
+      mimeType || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const normalizedExtension =
+    String(
+      extension || ""
+    )
+      .trim()
+      .toLowerCase();
+
   return (
-    mimeType.startsWith(
+    normalizedMimeType.startsWith(
       "image/"
     ) ||
-    mimeType ===
-      "application/pdf"
+    normalizedMimeType.startsWith(
+      "text/"
+    ) ||
+    normalizedMimeType.startsWith(
+      "application/"
+    ) ||
+    DIRECT_DOCUMENT_EXTENSIONS.has(
+      normalizedExtension
+    )
   );
 
 }
@@ -234,12 +290,26 @@ async function buildAttachment(
   const mimeType =
     getMimeType(file);
 
+  const extension =
+    String(
+      file.name || ""
+    )
+      .toLowerCase()
+      .match(/\.([a-z0-9]+)$/i)?.[1] ||
+    "";
 
   if (
     !isSupportedAIAttachment(
-      mimeType
+      mimeType,
+      extension
     )
   ) {
+
+    console.warn(
+      "[Nyxora Attachments] Unsupported file skipped:",
+      file.name || "Attachment",
+      mimeType
+    );
 
     return null;
 
@@ -261,6 +331,11 @@ async function buildAttachment(
     name:
       file.name ||
       "Attachment",
+
+    size:
+      Number(
+        file.size || 0
+      ),
 
   };
 
@@ -361,47 +436,45 @@ const attachment =
 
 
     // ==================================================
-    // LEGACY IMAGE PAYLOAD
+    // DOCUMENT REQUEST CONTRACT
     //
-    // Keep this temporarily while backend files are being
-    // upgraded.
+    // Every uploaded file is transported once through the
+    // generic `attachments` array. The backend owns the
+    // document-intelligence decision:
     //
-    // After the backend understands "attachment", image
-    // still remains available for compatibility.
+    // PDF/DOCX/XLSX/PPTX/etc.
+    //        -> Document Intelligence
+    //        -> document model pool
+    //        -> Gemini only as fallback
+    //
+    // Do NOT duplicate image bytes in a second legacy field.
+    // This prevents large PDF/image requests from being sent
+    // twice over the network.
     // ==================================================
 
-let image =
-  null;
+    const hasAttachments =
+      attachments.length > 0;
 
-
-const firstImageAttachment =
-  attachments.find(
-    (
-      selectedAttachment
-    ) =>
-      selectedAttachment
-        ?.mimeType
-        ?.startsWith(
-          "image/"
-        )
-  );
-
-
-if (
-  firstImageAttachment
-) {
-
-  image = {
-
-    data:
-      firstImageAttachment.data,
-
-    mimeType:
-      firstImageAttachment.mimeType,
-
-  };
-
-}
+    console.log(
+      "[Nyxora Attachments] REQUEST ->",
+      {
+        count:
+          attachments.length,
+        files:
+          attachments.map(
+            (item) => ({
+              name:
+                item.name,
+              mimeType:
+                item.mimeType,
+              size:
+                item.size,
+            })
+          ),
+        documentAnalysis:
+          hasAttachments,
+      }
+    );
 
 
     // ==================================================
@@ -462,11 +535,12 @@ if (
 
               attachments,
 
-
-              // Temporary backward compatibility
-              // for the existing backend.
-              image,
-
+              // Explicitly tell the backend that this request
+              // contains uploaded document/media data. The
+              // backend remains responsible for deciding the
+              // correct document routing task.
+              documentAnalysis:
+                hasAttachments,
 
               history,
 

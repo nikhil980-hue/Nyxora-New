@@ -1,7 +1,11 @@
 import ReactMarkdown from "react-markdown";
+
 import remarkGfm from "remark-gfm";
+
 import remarkMath from "remark-math";
+
 import rehypeRaw from "rehype-raw";
+
 import rehypeKatex from "rehype-katex";
 
 import "katex/dist/katex.min.css";
@@ -11,22 +15,40 @@ import CodeBlock from "../../../../shared/components/CodeBlock";
 export default function MessageContent({
   message,
 }) {
-
   // ====================================================
   // PREPROCESS AI OUTPUT
   // Fix mixed Markdown + LaTeX formatting
   // ====================================================
 
   const formattedMessage = String(message || "")
-    .replace(/<u>(.*?)<\/u>/gs, "**$1**")
-    .replace(/\$\$(.*?)\$\$/gs, "\n\n$$$1$$\n\n")
-    .replace(/(---)\s*(#{1,6}\s)/g, "$1\n\n$2")
-    .replace(/\n{3,}/g, "\n\n")
+    // Convert <u>...</u> into Markdown bold
+    .replace(
+      /<u>(.*?)<\/u>/gs,
+      "**$1**"
+    )
+
+    // Normalize display LaTeX blocks
+    .replace(
+      /\$\$([\s\S]*?)\$\$/g,
+      (_, content) => `\n\n$$${content}$$\n\n`
+    )
+
+    // Keep horizontal rules separated from headings
+    .replace(
+      /(---)\s*(#{1,6}\s)/g,
+      "$1\n\n$2"
+    )
+
+    // Prevent excessive blank lines
+    .replace(
+      /\n{3,}/g,
+      "\n\n"
+    )
+
     .trim();
 
   return (
     <div className="prose prose-invert max-w-none prose-headings:font-bold prose-headings:text-white prose-p:text-gray-200 prose-p:leading-8 prose-li:text-gray-200 prose-strong:text-white prose-a:text-violet-400 prose-blockquote:border-violet-500 prose-blockquote:text-gray-300">
-
       <ReactMarkdown
         remarkPlugins={[
           remarkGfm,
@@ -99,7 +121,6 @@ export default function MessageContent({
       >
         {formattedMessage}
       </ReactMarkdown>
-
     </div>
   );
 }
